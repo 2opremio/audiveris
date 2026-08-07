@@ -109,6 +109,10 @@ public class InterBoard
     private static final ResourceMap resources = Application.getInstance().getContext()
             .getResourceMap(InterBoard.class);
 
+    private static final String customNumberTip = resources.getString("customNumber.toolTipText");
+
+    private static final String customTimeTip = resources.getString("customTime.toolTipText");
+
     //~ Instance fields ----------------------------------------------------------------------------
 
     /** Related sheet. */
@@ -148,7 +152,7 @@ public class InterBoard
     private final LCheckBox tie = new LCheckBox("tie");
 
     /** Value or Numerator/Denominator of custom count or time. */
-    private final LTextField custom = new LTextField("custom"); ////// BINGO a suivre ------
+    private final LTextField custom = new LTextField(true, "custom");
 
     /** Font attributes for word. */
     private final LTextField fontAttributes = new LTextField(true, "fontAttributes");
@@ -556,6 +560,7 @@ public class InterBoard
                         custom.setText(number.getValue().toString());
                         custom.setEnabled(true);
                         custom.setVisible(true);
+                        custom.getField().setToolTipText(customNumberTip);
 
                         selfUpdatingText = false;
                     }
@@ -567,6 +572,7 @@ public class InterBoard
                     custom.setText(timeCustomInter.getTimeRational().toString());
                     custom.setEnabled(true);
                     custom.setVisible(true);
+                    custom.getField().setToolTipText(customTimeTip);
 
                     selfUpdatingText = false;
                 }

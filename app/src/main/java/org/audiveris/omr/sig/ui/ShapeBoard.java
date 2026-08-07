@@ -93,8 +93,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -180,8 +178,7 @@ public class ShapeBoard
     };
 
     /**
-     * Called-back when a set panel is closed:
-     * It is replaced by the global panel to allow the selection of another set.
+     * Called-back when a set panel is closed.
      */
     private final ActionListener closeListener = (ActionEvent e) -> {
         closeSet();
@@ -200,7 +197,7 @@ public class ShapeBoard
                 Glyph glyph = sheet.getGlyphIndex().getSelectedGlyph();
 
                 if (glyph != null) {
-                    ShapeButton button = (ShapeButton) e.getSource();
+                    SymbolButton button = (SymbolButton) e.getSource();
                     assignGlyph(glyph, button.getShape());
                 }
             }
@@ -273,7 +270,10 @@ public class ShapeBoard
         customSet = new CustomSet();
 
         if (Preferences.Topic.CUSTOM_SHAPE_SET.isSet()) {
-            trashCan = buildTrashCan();
+            trashCan = new JLabel();
+            trashCan.setName("trashCan");
+            resources.injectComponent(trashCan);
+
             customSet = new CustomSet();
         }
 
@@ -286,7 +286,7 @@ public class ShapeBoard
     // addButton //
     //-----------//
     private void addButton (Panel panel,
-                            ShapeButton button)
+                            SymbolButton button)
     {
         button.addMouseListener(mouseListener); // For double-click
         button.addMouseListener(dropAdapter); // For DnD transfer and double-click
@@ -323,7 +323,7 @@ public class ShapeBoard
 
             if (symbol != null) {
                 try {
-                    addButton(p, new ShapeButton(symbol));
+                    addButton(p, new SymbolButton(symbol));
                 } catch (Exception ex) {
                     logger.warn("No music glyph for shape: {}", shape, ex);
                 }
@@ -381,7 +381,7 @@ public class ShapeBoard
                 final ShapeSymbol symbol = getDecoratedSymbol(rep);
 
                 if (symbol != null) {
-                    final ShapeButton button = new ShapeButton(symbol);
+                    final SymbolButton button = new SymbolButton(symbol);
                     button.setName(set.getName());
                     button.addActionListener(setListener);
                     button.setBorderPainted(false);
@@ -425,7 +425,7 @@ public class ShapeBoard
         // Button to close this set and return to global panel
         final JButton close = new JButton(BACK);
         close.addActionListener(closeListener);
-        close.setToolTipText("Back to all-sets");
+        close.setToolTipText(resources.getString("close.toolTipText"));
         close.setBorderPainted(false); // To avoid visual confusion with draggable items
         panel.add(close);
 
@@ -466,23 +466,6 @@ public class ShapeBoard
         panel.addKeyListener(keyListener);
 
         return panel;
-    }
-
-    //---------------//
-    // buildTrashCan //
-    //---------------//
-    private JComponent buildTrashCan ()
-    {
-        // Trash icon
-        final String resourceName = resources.getString("trash.smallIcon");
-        final Icon icon = new ImageIcon(ShapeBoard.class.getResource(resourceName));
-        final String tip = resources.getString("trash.shortDescription");
-
-        /** The trash can. */
-        JLabel label = new JLabel(icon);
-        label.setToolTipText(tip);
-
-        return label;
     }
 
     //--------------//
@@ -918,7 +901,7 @@ public class ShapeBoard
     {
         for (Component comp : panel.getComponents()) {
             switch (comp) {
-                case ShapeButton shapeButton -> shapeButton.update();
+                case SymbolButton symbolButton -> symbolButton.update();
                 case Panel p -> updatePanel(p); // Recursively
                 default -> {}
             }
@@ -1033,7 +1016,7 @@ public class ShapeBoard
                 final ShapeSymbol symbol = getDecoratedSymbol(shape);
 
                 if (symbol != null) {
-                    final ShapeButton button = new ShapeButton(symbol);
+                    final SymbolButton button = new SymbolButton(symbol);
                     addButton(null, button);
                     builder.addRaw(button).xy(col, row);
                 } else {
@@ -1099,8 +1082,8 @@ public class ShapeBoard
             final List<Shape> shapes = getShapes();
             final int index = shapes.indexOf(shape);
 
-            if (component instanceof ShapeButton shapeButton) {
-                final Shape targetShape = shapeButton.getShape();
+            if (component instanceof SymbolButton symbolButton) {
+                final Shape targetShape = symbolButton.getShape();
                 final int targetIndex = shapes.indexOf(targetShape);
 
                 // Beware if the shape is already in the set and located before the target
@@ -1271,7 +1254,7 @@ public class ShapeBoard
         public void update ()
         {
             for (Component comp : panel.getComponents()) {
-                if (comp instanceof ShapeButton shapeButton) {
+                if (comp instanceof SymbolButton shapeButton) {
                     final Shape shape = shapeButton.getShape();
                     final ShapeSymbol symbol = getTinyDecoratedSymbol(shape);
 
@@ -1351,7 +1334,7 @@ public class ShapeBoard
                     }
                 }
 
-                final ShapeButton button = new ShapeButton(symbol);
+                final SymbolButton button = new SymbolButton(symbol);
                 addButton(null, button);
                 builder.addRaw(button).xy(col, row);
             }
@@ -1452,7 +1435,7 @@ public class ShapeBoard
             // Reset the motion adapter
             motionAdapter.reset();
 
-            final ShapeButton button = (ShapeButton) e.getSource();
+            final SymbolButton button = (SymbolButton) e.getSource();
             final Shape shape = button.getShape();
 
             // Set shape
@@ -1582,7 +1565,7 @@ public class ShapeBoard
 
                 prevScreenPoint = screenPoint;
 
-                final ShapeButton button = (ShapeButton) e.getSource();
+                final SymbolButton button = (SymbolButton) e.getSource();
                 final Shape shape = button.getShape();
                 final OmrGlassPane glass = (OmrGlassPane) glassPane;
 
@@ -1691,30 +1674,33 @@ public class ShapeBoard
                 JPopupMenu popup = new SeparablePopupMenu();
 
                 // A title for this menu
-                final JMenuItem head = new JMenuItem(resources.getString("trash.menu.title"));
-                head.setHorizontalAlignment(SwingConstants.CENTER);
-                head.setEnabled(false);
-                popup.add(head);
+                final JMenuItem title = new JMenuItem();
+                title.setName("trashTitle");
+                resources.injectComponent(title);
+                title.setHorizontalAlignment(SwingConstants.CENTER);
+                title.setEnabled(false);
+                popup.add(title);
 
                 popup.addSeparator();
 
-                final JMenuItem item = new JMenuItem(resources.getString("trash.clear.text"));
-                item.addActionListener(this);
-                item.setToolTipText(resources.getString("trash.clear.shortDescription"));
-                popup.add(item);
+                final JMenuItem clear = new JMenuItem();
+                clear.setName("trashClear");
+                resources.injectComponent(clear);
+                clear.addActionListener(this);
+                popup.add(clear);
 
                 popup.show(trashCan, e.getX(), e.getY());
             }
         }
     }
 
-    //-------------//
-    // ShapeButton //
-    //-------------//
+    //--------------//
+    // SymbolButton //
+    //--------------//
     /**
-     * A button dedicated to a shape.
+     * A button dedicated to a shape symbol.
      */
-    private class ShapeButton
+    private class SymbolButton
             extends JButton
     {
         // Symbol to be passed to DnD, standard size, perhaps decorated
@@ -1725,12 +1711,11 @@ public class ShapeBoard
          *
          * @param decoSymbol related symbol
          */
-        public ShapeButton (ShapeSymbol decoSymbol)
+        public SymbolButton (ShapeSymbol decoSymbol)
         {
             this.decoSymbol = decoSymbol;
 
             setIcon(decoSymbol.getTinyVersion());
-            setName(decoSymbol.getShape().toString());
 
             final String shortcut = ShapeShortcuts.getReverseShapeMap().get(decoSymbol.getShape());
             setToolTipText(decoSymbol.getTip() + standardized(shortcut));
@@ -1785,7 +1770,7 @@ public class ShapeBoard
         public void setFocus ()
         {
             for (Component comp : panel.getComponents()) {
-                if (comp instanceof ShapeButton button) {
+                if (comp instanceof SymbolButton button) {
                     button.requestFocusInWindow();
 
                     return;

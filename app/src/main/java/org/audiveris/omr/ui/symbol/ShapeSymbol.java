@@ -552,7 +552,7 @@ public class ShapeSymbol
      */
     public String getTip ()
     {
-        return shape.toString(); // By default, use the shape name
+        return shape.getDescription();
     }
 
     //-----------------//

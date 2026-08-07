@@ -55,6 +55,7 @@ import org.slf4j.LoggerFactory;
 
 import com.jgoodies.forms.builder.FormBuilder;
 
+import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.text.MessageFormat;
 import java.text.ParseException;
@@ -171,6 +172,10 @@ public class BookParameters
     {
         scrollPane.setViewportView(component);
 
+        // To make sure all items are visibe
+        component.setPreferredSize(new Dimension(370, 1000));
+        final Dimension minDimension = new Dimension(370, 950);
+
         // Default panel
         final XactPanes defaultPanes = new DefaultPanes();
         xactPanes.put(GLOBAL_SCOPE, defaultPanes);
@@ -179,6 +184,7 @@ public class BookParameters
                 resources.getString("defaultTab.toolTipText"),
                 buildTopics(GLOBAL_SCOPE, null, defaultPanes, false, false), // No interline, no beam
                 resources);
+        defaultPanel.setPreferredSize(minDimension);
         final String defaultTitle = resources.getString("defaultTab.text");
         component.addTab(defaultTitle, null, defaultPanel, defaultPanel.getName());
         panels.put(GLOBAL_SCOPE, defaultPanel);
@@ -193,6 +199,7 @@ public class BookParameters
                     resources.getString("bookTab.toolTipText"),
                     buildTopics(book, GLOBAL_SCOPE, bookPanes, true, true),
                     resources);
+            bookPanel.setPreferredSize(minDimension);
             component.addTab(book.getRadix(), null, bookPanel, bookPanel.getName());
             panels.put(book, bookPanel);
 
@@ -214,6 +221,8 @@ public class BookParameters
                     if (s == stub) {
                         label = "*" + label + "*"; // Currently selected stub
                     }
+
+                    sheetPanel.setPreferredSize(minDimension);
 
                     component.addTab(label, null, sheetPanel, sheetPanel.getName());
                     panels.put(s, sheetPanel);
@@ -946,12 +955,16 @@ public class BookParameters
             }
 
             final SpinData ilSpin = new SpinData(
+                    "",
+                    resources.getString("InterlinePane.toolTipText"),
                     new SpinnerNumberModel(0, 0, ScaleBuilder.getMaxInterline(), 1));
             tagMap.put(Tag.Interline, new IntegerSpinPane<>(Tag.Interline, ilSpin, resources));
 
             tagMap.put(Tag.Barline, new EnumPane<>(Tag.Barline, BarlineHeight.values(), resources));
 
             final SpinData beamSpin = new SpinData(
+                    "",
+                    resources.getString("BeamPane.toolTipText"),
                     new SpinnerNumberModel(0, 0, ScaleBuilder.getMaxInterline(), 1));
             tagMap.put(Tag.Beam, new IntegerSpinPane<>(Tag.Beam, beamSpin, resources));
 
