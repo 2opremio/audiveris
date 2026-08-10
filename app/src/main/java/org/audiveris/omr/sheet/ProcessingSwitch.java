@@ -22,11 +22,10 @@
 package org.audiveris.omr.sheet;
 
 import org.audiveris.omr.constant.Constant;
-
-import org.jdesktop.application.Application;
-import org.jdesktop.application.ResourceMap;
+import org.audiveris.omr.util.ResourceUtil;
 
 import java.util.EnumSet;
+import java.util.ResourceBundle;
 
 /**
  * Class <code>ProcessingSwitch</code> is the enumeration of all possible processing
@@ -89,8 +88,7 @@ public enum ProcessingSwitch
     //~ Static fields/initializers -----------------------------------------------------------------
 
     /** Resource injection. */
-    private static final ResourceMap resources = Application.getInstance().getContext()
-            .getResourceMap(ProcessingSwitch.class);
+    private static final ResourceBundle resources = ResourceUtil.getBundle(ProcessingSwitch.class);
 
     /**
      * The switches currently supported.

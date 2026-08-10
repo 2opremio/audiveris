@@ -29,9 +29,7 @@ import org.audiveris.omr.ui.symbol.FontSymbol;
 import org.audiveris.omr.ui.symbol.MusicFamily;
 import org.audiveris.omr.ui.symbol.MusicFont;
 import org.audiveris.omr.ui.symbol.ShapeSymbol;
-
-import org.jdesktop.application.Application;
-import org.jdesktop.application.ResourceMap;
+import org.audiveris.omr.util.ResourceUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +40,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.ResourceBundle;
 
 /**
  * Enum <code>Shape</code> defines the comprehensive enumeration of glyph shapes.
@@ -546,8 +545,7 @@ public enum Shape
 
     private static final Logger logger = LoggerFactory.getLogger(Shape.class);
 
-    private static final ResourceMap resources = Application.getInstance().getContext()
-            .getResourceMap(Shape.class);
+    private static final ResourceBundle resources = ResourceUtil.getBundle(Shape.class);
 
     /** Last physical shape. */
     public static final Shape LAST_PHYSICAL_SHAPE = CLUTTER;

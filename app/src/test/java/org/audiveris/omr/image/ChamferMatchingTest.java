@@ -40,6 +40,7 @@ import java.util.List;
  */
 public class ChamferMatchingTest
 {
+    // @formatter:off
     private static final String[] imageRows = new String[]
     {
             "                                    ",
@@ -91,6 +92,7 @@ public class ChamferMatchingTest
             "  XXXXXXXXXXXXXXXX    ",
             "     XXXXXXXXXXXX     ",
             "       XXXXXXXXX      " };
+    // @formatter:on
 
     /**
      * Test of matchAll method, of class DistanceMatching.
