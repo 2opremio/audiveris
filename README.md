@@ -1,19 +1,19 @@
 # WARNING
-### Beware of site [audiveris.com](https://audiveris.com/)!
+### Beware of sites [audiveris.com](https://audiveris.com/) and [audiveris.net](https://audiveris.net/)!
 
 ```diff
-- The site https://audiveris.com  (note the `.com` extension)
--  has nothing to do with Audiveris and seems to be a fraudulent site.
+- The sites https://audiveris.com https://audiveris.net  (note the `.com` and `.net` extensions)
+-  have nothing to do with Audiveris.
+- They are reported to be high-risk websites, flagged by online security scanners as potential scams.
 ```
-
-![](https://github.com/Audiveris/audiveris.github.io/blob/master/assets/images/audiveris.com.png)
+| audiveris.com | audiveris.net |
+| :---:         | :---:         |
+|![](https://github.com/Audiveris/audiveris.github.io/blob/master/assets/images/audiveris.com.png)|![](https://github.com/Audiveris/audiveris.github.io/blob/master/assets/images/audiveris.net.png)|
 
 ```diff
-- The site is aesthetically pleasing
--  and looks like an advertisement for Audiveris software.
-- However, users report that links redirect to pages
--  dedicated to cryptocurrencies, sports betting, etc.
-- It has all the hallmarks of a phishing site…
+- These twin sites are aesthetically pleasing and look like advertisement for the Audiveris software.
+- However, users report that links redirect to pages dedicated to cryptocurrencies, sports betting, etc.
+- They have all the hallmarks of phishing sites…
 ```
 
 ![](https://github.com/Audiveris/docs/blob/master/images/SplashLogo.png)
@@ -71,7 +71,9 @@ You can download any installer file from the **Assets** section, at the end of t
 | Linux   | `.deb` |
 | macOS   | `.dmg` |
 
-Additionally for **Linux**, a _flatpak_ package, also with a suitable JRE included,
+Additional installation means:
+- Under **Windows**, the _`winget`_ or _`scoop`_ utilities can be directly used to install the application.
+- Under **Linux**, a _`flatpak`_ package, also with a suitable JRE included,
 can be installed from the [Flathub] site.
 
 See installers details in the handbook [installation] section.
@@ -81,7 +83,7 @@ See installers details in the handbook [installation] section.
 The Audiveris project is developed on GitHub, the site you are reading.  
 Any one can clone, build and run this software. 
 The needed tools are `git`, `gradle` and a Java Development Kit (`jdk`),
-as described in the handbook [sources section][sources].
+as described in the handbook [sources][sources] section.
 
 There are two main branches in the Audiveris project:
 - the `master` branch is the GitHub default branch;
