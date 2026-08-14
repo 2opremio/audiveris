@@ -25,6 +25,7 @@ import org.audiveris.omr.constant.Constant;
 import org.audiveris.omr.util.ResourceUtil;
 
 import java.util.EnumSet;
+import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
 /**
@@ -162,11 +163,13 @@ public enum ProcessingSwitch
     //---------//
     public String getText ()
     {
-        // Priority is given to text in resources file if any
-        final String desc = resources.getString(name() + ".text");
-
-        // Fallback using constant description text
-        return (desc != null) ? desc : constant.getDescription();
+        try {
+            // Priority is given to text in resources file if any
+            return resources.getString(name() + ".text");
+        } catch (MissingResourceException ignored) {
+            // Fallback using constant description text
+            return constant.getDescription();
+        }
     }
 
     //--------//
