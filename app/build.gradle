@@ -211,15 +211,6 @@ tasks.register('downloadJazzPerc', Download) {
     tempAndMove true
 }
 
-// Download Leland font(s)
-tasks.register('downloadLeland', Download) {
-    def root = "https://github.com/MuseScoreFonts/Leland/blob/main"
-    src ["${root}/Leland.otf",
-         "${root}/LelandText.otf",]
-    dest 'res'
-    overwrite false
-}
-
 classes {
     dependsOn 'downloadBravura'
     dependsOn 'downloadJazzPerc'
