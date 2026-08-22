@@ -214,7 +214,6 @@ tasks.register('downloadJazzPerc', Download) {
 classes {
     dependsOn 'downloadBravura'
     dependsOn 'downloadJazzPerc'
-    dependsOn 'downloadLeland'
 }
 
 // Generate application.jar
