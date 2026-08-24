@@ -21,8 +21,9 @@
 // </editor-fold>
 package org.audiveris.omr.sheet;
 
-import org.jdesktop.application.Application;
-import org.jdesktop.application.ResourceMap;
+import org.audiveris.omr.util.ResourceUtil;
+
+import java.util.ResourceBundle;
 
 /**
  * Scale information item.
@@ -38,8 +39,7 @@ public enum ScaleItem
 
     //~ Static fields/initializers -----------------------------------------------------------------
 
-    private static final ResourceMap resources = Application.getInstance().getContext()
-            .getResourceMap(ScaleItem.class);
+    private static final ResourceBundle resources = ResourceUtil.getBundle(ScaleItem.class);
 
     //~ Instance fields ----------------------------------------------------------------------------
 
