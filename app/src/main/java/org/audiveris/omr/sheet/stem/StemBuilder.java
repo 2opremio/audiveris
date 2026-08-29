@@ -1093,7 +1093,6 @@ public class StemBuilder
         }
 
         final TreeMap<Integer, Integer> gapMap = retriever.getGapMap();
-        final int maxGap = gapMap.get(maxStemProfile);
         final int maxIndex = items.size() - 1;
 
         for (int i = 0; i <= maxIndex; i++) {
@@ -1110,14 +1109,6 @@ public class StemBuilder
                     } else {
                         break;
                     }
-                }
-
-                if (ev.contrib > maxGap) {
-                    if (lengthMap.get(maxStemProfile) == null) {
-                        lengthMap.put(maxStemProfile, getLengthAt(i - 1));
-                    }
-
-                    return;
                 }
             }
         }
