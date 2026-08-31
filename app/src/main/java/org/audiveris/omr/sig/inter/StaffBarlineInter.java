@@ -912,7 +912,11 @@ public final class StaffBarlineInter
 
             case 3 -> true; // Style should be LIGHT_HEAVY_LIGHT
 
-            default -> false;
+            // Any other count: the dots are what spell the repeat, and the bar count
+            // only decides thin against thick. One bar line is a repeat when a pair of
+            // dots is bound to it, and a group of more than three carries more than the
+            // sign, a section double bar engraved hard against it for instance.
+            default -> size > 0;
         };
     }
 
@@ -960,7 +964,11 @@ public final class StaffBarlineInter
 
             case 3 -> true; // Style should be LIGHT_HEAVY_LIGHT
 
-            default -> false;
+            // Any other count: the dots are what spell the repeat, and the bar count
+            // only decides thin against thick. One bar line is a repeat when a pair of
+            // dots is bound to it, and a group of more than three carries more than the
+            // sign, a section double bar engraved hard against it for instance.
+            default -> size > 0;
         };
     }
 
