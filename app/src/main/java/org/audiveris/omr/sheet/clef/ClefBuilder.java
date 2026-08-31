@@ -217,10 +217,31 @@ public class ClefBuilder
             bestMap = getBestMap(false);
         }
 
-        // Register the remaining clef candidates
-        if (!bestMap.isEmpty()) {
+        // Register the remaining clef candidates, unless none of them is really a
+        // clef.  The second attempt above reads a smaller area, and on a staff
+        // with no clef printed at all it settles on whatever stands at the start
+        // of the music.  Taking that costs more than it gains: the header runs
+        // from the bar line to the end of the clef, and everything inside it is
+        // erased before symbols are looked for, so a clef read from the first
+        // note column takes that music with it.
+        if (!bestMap.isEmpty() && bestGrade(bestMap) >= constants.minRegisteredGrade
+                .getValue()) {
             registerClefs(bestMap.values());
         }
+    }
+
+    //-----------//
+    // bestGrade //
+    //-----------//
+    private static double bestGrade (Map<ClefKind, ClefInter> bestMap)
+    {
+        double best = 0;
+
+        for (ClefInter clef : bestMap.values()) {
+            best = Math.max(best, clef.getGrade());
+        }
+
+        return best;
     }
 
     //------------//
@@ -732,6 +753,10 @@ public class ClefBuilder
                 "none",
                 3,
                 "Maximum acceptable rank in clef evaluation");
+
+        private final Constant.Ratio minRegisteredGrade = new Constant.Ratio(
+                0.65,
+                "Minimum grade for a staff header clef to be kept at all");
     }
 
     //------------//
