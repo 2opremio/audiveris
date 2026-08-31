@@ -554,8 +554,8 @@ public class SentenceInter
     /**
      * Try to detect the right repeat barline that this repeat count applies to.
      * <p>
-     * The count is printed just above or just below the barline, so the search window is kept
-     * well below the vertical gap between two systems.
+     * The count is printed above the staff, over the barline it counts, so only a barline below
+     * the count is considered, and no further below than the gap between two systems.
      *
      * @param system surrounding system
      * @return detected link or null
@@ -584,13 +584,9 @@ public class SentenceInter
                 continue;
             }
 
-            final double dy = Math.max(
-                    0,
-                    Math.max(
-                            barBox.y - textCenter.getY(),
-                            textCenter.getY() - (barBox.y + barBox.height)));
+            final double dy = barBox.y - textCenter.getY();
 
-            if (dy > maxDy) {
+            if ((dy < 0) || (dy > maxDy)) {
                 continue;
             }
 
@@ -800,6 +796,6 @@ public class SentenceInter
 
         private final Scale.Fraction maxRepeatCountDy = new Scale.Fraction(
                 6.0,
-                "Maximum ordinate gap between a right repeat and its repeat count");
+                "Maximum distance above a right repeat for its repeat count");
     }
 }

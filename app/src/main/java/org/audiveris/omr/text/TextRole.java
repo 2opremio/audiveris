@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.geom.Point2D;
+import java.util.List;
 import java.util.regex.Matcher;
 
 /**
@@ -142,11 +143,9 @@ public enum TextRole
             return null;
         }
 
-        // A single word such as "x4" or "4x" is a repeat count, whatever its location.
-        // Two words are refused, because on a drum staff a cross note head reads as an "x"
-        // and could pair with any number that OCR put on the same line.
-        if ((line.getWords().size() == 1) //
-                && (StaffBarlineInter.repeatCountOf(line.getValue()) != null)) {
+        // A word such as "x4" or "4x" standing clear of its neighbours is a repeat count,
+        // whatever its location.
+        if (hasLoneRepeatCount(line, system.getSheet().getScale())) {
             return RepeatCount;
         }
 
@@ -314,6 +313,50 @@ public enum TextRole
 
         // Default
         return UnknownRole;
+    }
+
+    //--------------------//
+    // hasLoneRepeatCount //
+    //--------------------//
+    /**
+     * Report whether the provided line contains a repeat count word, such as "x4", that no
+     * other word of the line comes close to.
+     * <p>
+     * Distance is what separates a printed count from a false reading: on a drum staff a cross
+     * note head reads as an "x" that OCR can pair with a number, but such a pair is adjacent by
+     * construction. The threshold is the line word gap, the very gap at which a standard line
+     * gets split in two, so a count that merely shares a baseline with distant words does end
+     * up alone on a line of its own, whose value is then the count.
+     *
+     * @param line  the line to check
+     * @param scale scale of containing sheet
+     * @return true if such a word is found
+     */
+    private static boolean hasLoneRepeatCount (TextLine line,
+                                               Scale scale)
+    {
+        final List<TextWord> words = line.getWords();
+        final int maxGap = line.selectWordGap(scale);
+
+        for (int i = 0; i < words.size(); i++) {
+            final TextWord word = words.get(i);
+
+            if (StaffBarlineInter.repeatCountOf(word.getValue()) == null) {
+                continue;
+            }
+
+            final Rectangle wordBox = word.getBounds();
+            final boolean freeOnLeft = (i == 0) //
+                    || (GeoUtil.xGap(words.get(i - 1).getBounds(), wordBox) > maxGap);
+            final boolean freeOnRight = (i == words.size() - 1) //
+                    || (GeoUtil.xGap(wordBox, words.get(i + 1).getBounds()) > maxGap);
+
+            if (freeOnLeft && freeOnRight) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
