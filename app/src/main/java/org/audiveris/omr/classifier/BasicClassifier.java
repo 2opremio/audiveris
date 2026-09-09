@@ -44,6 +44,7 @@ import org.apache.commons.io.FileUtils;
 import org.jfree.data.xy.XYSeries;
 
 import java.awt.Color;
+import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -585,7 +586,12 @@ public class BasicClassifier
             return;
         }
 
-        if (chartListener == null) {
+        // The chart listener opens two Swing windows, so it cannot be built
+        // where there is no display. Training is otherwise headless: it is
+        // reachable through the public Classifier.train, and a caller wanting
+        // to retrain from a script or from CI has no use for the charts and
+        // no way to avoid them.
+        if ((chartListener == null) && !GraphicsEnvironment.isHeadless()) {
             addListener(chartListener = new ChartListener());
         }
 
