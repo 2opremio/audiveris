@@ -80,6 +80,18 @@ public abstract class AbstractChordInter
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractChordInter.class);
 
+    /**
+     * Maximum number of beams and flags that can shorten a note.
+     * <p>
+     * The smallest note there is a shape for is a {@link Shape#FLAG_5}, so beyond five the count
+     * is a misreading rather than music.
+     * <p>
+     * The bound matters because halving a duration doubles its denominator, which is an int, so
+     * an unbounded count overflows it to zero and {@link Rational} then rejects it. That threw
+     * inside a per-system step, so one misread chord cost the whole book.
+     */
+    private static final int MAX_BEAMS_OR_FLAGS = 5;
+
     /** For comparing chords by head location ordinate. */
     public static final Comparator<AbstractChordInter> byHeadOrdinate = //
             (c1,
@@ -563,7 +575,13 @@ public abstract class AbstractChordInter
                         dur = Shape.NOTEHEAD_BLACK.getNoteDuration();
                     }
 
-                    for (int i = 0; i < fbn; i++) {
+                    if (fbn > MAX_BEAMS_OR_FLAGS) {
+                        logger.warn("{} carries {} beams/flags, beyond the {} a note can have."
+                                + " Duration taken as if it had {}.",
+                                    this, fbn, MAX_BEAMS_OR_FLAGS, MAX_BEAMS_OR_FLAGS);
+                    }
+
+                    for (int i = 0; i < Math.min(fbn, MAX_BEAMS_OR_FLAGS); i++) {
                         dur = dur.divides(2);
                     }
                 }
