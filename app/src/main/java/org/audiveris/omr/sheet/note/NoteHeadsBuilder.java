@@ -51,12 +51,14 @@ import org.audiveris.omr.run.Orientation;
 import org.audiveris.omr.score.DrumSet;
 import org.audiveris.omr.score.DrumSet.DrumInstrument;
 import org.audiveris.omr.sheet.Part;
+import org.audiveris.omr.sheet.ProcessingSwitch;
 import org.audiveris.omr.sheet.Picture;
 import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.Sheet;
 import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sheet.SystemInfo;
 import org.audiveris.omr.sheet.grid.LineInfo;
+import org.audiveris.omr.sheet.header.StaffHeader;
 import org.audiveris.omr.sig.GradeImpacts;
 import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractBeamInter;
@@ -1629,7 +1631,7 @@ public class NoteHeadsBuilder
         {
             final Staff staff = line.getStaff();
 
-            if (!staff.isDrum()) {
+            if (!isUnpitched(staff)) {
                 return sheetTemplateNotesAll;
             }
 
@@ -1663,6 +1665,49 @@ public class NoteHeadsBuilder
             }
 
             return allShapes;
+        }
+
+        //-------------//
+        // isUnpitched //
+        //-------------//
+        /**
+         * Report whether a staff is to be read as unpitched, so that its head
+         * templates are limited to the motifs the drum set lists for each pitch.
+         * <p>
+         * {@link Staff#isDrum()} answers this from a PERCUSSION_CLEF, and a great
+         * many drum charts print no clef at all: the staff opens straight onto its
+         * time signature. Such a staff is taken for pitched, every head template
+         * then competes at every pitch rather than only those the drum set allows,
+         * and the wrong motifs win: a cymbal comes back as a diamond.
+         * <p>
+         * Setting {@code drumNotation} is the user saying what the sheet is, so it
+         * stands in for a clef that was never printed. A staff whose clef
+         * <i>was</i> read and is not a percussion clef stays pitched, so a sheet
+         * carrying a drum staff beside a melodic one is unaffected.
+         * <p>
+         * Asked here rather than inside {@code Staff.isDrum()} because
+         * {@code ClefBuilder} asks that too, while it is still choosing which clef
+         * shapes to look for. A true answer there narrows the candidates to
+         * PERCUSSION_CLEF alone, and the melodic staff above would never find its
+         * own clef. By this step the clef question is settled either way.
+         *
+         * @param staff the staff to test
+         * @return true if its heads are to be looked up in the drum set
+         */
+        private boolean isUnpitched (Staff staff)
+        {
+            if (staff.isDrum()) {
+                return true;
+            }
+
+            final StaffHeader header = staff.getHeader();
+
+            if ((header != null) && (header.clef != null)) {
+                return false;
+            }
+
+            return staff.getSystem().getSheet().getStub().getProcessingSwitches()
+                    .getValue(ProcessingSwitch.drumNotation);
         }
 
         //-----------------//
