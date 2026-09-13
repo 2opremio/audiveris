@@ -678,9 +678,14 @@ public class NoteHeadsBuilder
     private List<Area> getSystemBarAreas ()
     {
         final List<Area> areas = new ArrayList<>();
+        // Every barline the grid found, not only the frozen ones. A thin barline
+        // in the middle of a system is not frozen, and left unprotected its own
+        // ink is taken for a stem: on one chart a barline became the stem of two
+        // cross heads matched on the digits of the time signature beside it, and
+        // the barline, the signature and the measure behind it all went.
         final List<Inter> inters = sig.inters(
-                inter -> inter.isFrozen() && (inter instanceof BarlineInter
-                        || inter instanceof BarConnectorInter));
+                inter -> inter instanceof BarlineInter
+                        || inter instanceof BarConnectorInter);
         Collections.sort(inters, Inters.byOrdinate);
 
         for (Inter inter : inters) {
