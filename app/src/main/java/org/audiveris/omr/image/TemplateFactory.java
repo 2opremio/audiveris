@@ -42,6 +42,7 @@ import static org.audiveris.omr.util.HorizontalSide.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Font;
@@ -55,6 +56,7 @@ import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -85,6 +87,19 @@ import java.util.TreeMap;
 public class TemplateFactory
 {
     //~ Static fields/initializers -----------------------------------------------------------------
+
+    /**
+     * The head each circled shape is a ring around.
+     * <p>
+     * A font draws a circled head as one glyph, its cross shrunk to keep the whole the width of
+     * a plain head. Engravers ring a head of normal size instead, so the ring is what moves and
+     * the head inside it is the ordinary one, which is how the second template is built.
+     */
+    private static final Map<Shape, Shape> RINGED = Map.of(
+            NOTEHEAD_CIRCLE_X, NOTEHEAD_CROSS,
+            NOTEHEAD_CIRCLE_X_VOID, NOTEHEAD_CROSS_VOID,
+            WHOLE_NOTE_CIRCLE_X, WHOLE_NOTE_CROSS,
+            BREVE_CIRCLE_X, BREVE_CROSS);
 
     private static final Constants constants = new Constants();
 
@@ -597,14 +612,16 @@ public class TemplateFactory
      *
      * @param shape     the given shape
      * @param family    the font family
-     * @param pointSize the font point size
+     * @param pointSize   the font point size
+     * @param strokeSlack whether the page may draw the strokes thinner than the font
      * @return the collection of testing locations
      */
     public static List<PixelDistance> retrieveKeyPoints (Shape shape,
                                                          MusicFamily family,
-                                                         int pointSize)
+                                                         int pointSize,
+                                                         boolean strokeSlack)
     {
-        return new Builder(shape, family, pointSize).processSymbol(1);
+        return new Builder(shape, family, pointSize, strokeSlack).processSymbol(1);
     }
 
     //~ Inner Classes ------------------------------------------------------------------------------
@@ -623,18 +640,27 @@ public class TemplateFactory
 
         private final int pointSize;
 
+        /** Whether the strokes may be engraved thinner than the font draws them. */
+        private final boolean strokeSlack;
+
+        /** Per pixel, how far ink may be from it and still satisfy it. */
+        private int[][] slacks;
+
         /**
-         * @param shape     shape of the template
-         * @param family    the chosen MusicFont family
-         * @param pointSize precise scaling for font
+         * @param shape       shape of the template
+         * @param family      the chosen MusicFont family
+         * @param pointSize   precise scaling for font
+         * @param strokeSlack whether the page may draw the strokes thinner than the font
          */
         public Builder (Shape shape,
                         MusicFamily family,
-                        int pointSize)
+                        int pointSize,
+                        boolean strokeSlack)
         {
             this.shape = shape;
             this.family = family;
             this.pointSize = pointSize;
+            this.strokeSlack = strokeSlack;
         }
 
         /**
@@ -776,7 +802,97 @@ public class TemplateFactory
                 setHoleDistances(distances, img);
             }
 
+            if (strokeSlack) {
+                slacks = strokeSlacks(distances);
+            }
+
             return distances;
+        }
+
+        /**
+         * Report, per foreground pixel, how far ink may be from it and still satisfy it.
+         * <p>
+         * A circled head is drawn as strokes, and engravings differ far more in how wide they
+         * draw a stroke than in where they run it: this font draws the ring three pixels wide
+         * where the page draws it one, so two thirds of the ring keypoints ask for ink the page
+         * never puts there. Each pixel of a stroke is therefore allowed to find its ink
+         * anywhere down the middle of that stroke, which is where both engravings agree.
+         *
+         * @param distances the template distances, foreground at zero
+         * @return the slack of every pixel, zero outside the foreground
+         */
+        private int[][] strokeSlacks (DistanceTable distances)
+        {
+            final int width = distances.getWidth();
+            final int height = distances.getHeight();
+            final boolean[][] back = new boolean[width][height];
+
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    back[x][y] = distances.getValue(x, y) != 0;
+                }
+            }
+
+            // How deep inside its stroke each foreground pixel lies, and which pixels run
+            // along the middle of one
+            final DistanceTable depth = new ChamferDistance.Short().compute(back);
+            final boolean[][] middle = new boolean[width][height];
+
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    middle[x][y] = !back[x][y] && isRidge(depth, x, y);
+                }
+            }
+
+            // Each pixel may find its ink anywhere within the width of its own stroke
+            final DistanceTable toMiddle = new ChamferDistance.Short().compute(middle);
+            final int[][] slacks = new int[width][height];
+
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    if (!back[x][y]) {
+                        // How deep the pixel sits plus how far the middle is, which is the
+                        // half-width of the stroke it belongs to
+                        slacks[x][y] = depth.getValue(x, y) + toMiddle.getValue(x, y);
+                    }
+                }
+            }
+
+            return slacks;
+        }
+
+        /**
+         * Report whether no neighbour lies deeper in the stroke.
+         *
+         * @param depth distance of every pixel to the nearest background pixel
+         * @param x     pixel abscissa
+         * @param y     pixel ordinate
+         * @return true if no neighbour lies deeper in the stroke
+         */
+        private boolean isRidge (DistanceTable depth,
+                                 int x,
+                                 int y)
+        {
+            final int here = depth.getValue(x, y);
+
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    final int nx = x + dx;
+                    final int ny = y + dy;
+
+                    if ((dx == 0 && dy == 0) //
+                            || (nx < 0) || (nx >= depth.getWidth()) //
+                            || (ny < 0) || (ny >= depth.getHeight())) {
+                        continue;
+                    }
+
+                    if (depth.getValue(nx, ny) > here) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         /**
@@ -800,12 +916,114 @@ public class TemplateFactory
                     final int dist = distances.getValue(x, y);
 
                     if (dist <= maxDist) {
-                        keyPoints.add(new PixelDistance(x, y, dist));
+                        keyPoints.add(
+                                new PixelDistance(x, y, dist, slacks == null ? 0 : slacks[x][y]));
                     }
                 }
             }
 
             return keyPoints;
+        }
+
+        /**
+         * Build a template for a circled head drawn the way engravers draw one: the plain head
+         * at its ordinary size, with a ring around it.
+         * <p>
+         * The font's own circled head shrinks the head to keep the ring the width of a plain
+         * one, which puts the ring along the arms of the very cross it is meant to tell apart.
+         * Drawn this way the ring circumscribes the head instead, so its ink is somewhere a
+         * plain head has none.
+         *
+         * @return the brand new template, or null if the font cannot draw the plain head
+         */
+        public Template buildRingedTemplate ()
+        {
+            final MusicFont font = MusicFont.getMusicFont(family, pointSize);
+            final TemplateSymbol plain = new TemplateSymbol(RINGED.get(shape), family);
+
+            if (plain.getDimension(font) == null) {
+                logger.info("{} No template for {}", family, shape);
+
+                return null;
+            }
+
+            final BufferedImage head = plain.buildImage(font);
+            binarize(head, constants.binarizationThreshold.getValue());
+            final Rectangle headInk = getSlimBounds(head, plain.getFatBounds(font));
+
+            // The ring passes through the head's own corners, which is where an engraver puts it
+            final double diameter = Math.hypot(headInk.width, headInk.height);
+            final int stroke = ringStroke(font);
+            final int room = 2 * (int) Math.ceil(maxDistanceFromSymbol(pointSize));
+            final int side = (int) Math.ceil(diameter + stroke) + room;
+
+            final BufferedImage img = new BufferedImage(side, side, BufferedImage.TYPE_INT_RGB);
+            final Graphics2D g = img.createGraphics();
+            g.setColor(new Color(BACK));
+            g.fillRect(0, 0, side, side);
+
+            // The head sits at the centre, the ring around it
+            g.drawImage(head,
+                        (side / 2) - (headInk.x + headInk.width / 2),
+                        (side / 2) - (headInk.y + headInk.height / 2),
+                        null);
+            g.setColor(new Color(FORE));
+            g.setStroke(new BasicStroke(stroke));
+            g.draw(new Ellipse2D.Double((side - diameter) / 2, (side - diameter) / 2,
+                                        diameter, diameter));
+            g.dispose();
+
+            final Rectangle fatBounds = new Rectangle(
+                    (int) Math.rint((side - diameter - stroke) / 2),
+                    (int) Math.rint((side - diameter - stroke) / 2),
+                    (int) Math.ceil(diameter + stroke),
+                    (int) Math.ceil(diameter + stroke));
+            final Rectangle slimBounds = getSlimBounds(img, fatBounds);
+            final Template tpl = new Template(shape, family, pointSize, side, side,
+                                              buildKeyPoints(buildDistances(img, fatBounds)),
+                                              slimBounds, strokeSlack);
+            addAnchors(tpl, slimBounds);
+
+            if (constants.saveTemplates.isSet()) {
+                ImageUtil.saveOnDisk(buildDecoratedImage(tpl),
+                                     "templates-" + family + "-" + pointSize + "-ringed",
+                                     shape.name());
+            }
+
+            return tpl;
+        }
+
+        /**
+         * Report how wide a stroke the font draws its own ring with, so the drawn one is no
+         * lighter or heavier than the engraving the font was fitted to.
+         *
+         * @param font the font at this template's size
+         * @return the ring stroke, in pixels, at least one
+         */
+        private int ringStroke (MusicFont font)
+        {
+            final TemplateSymbol circled = new TemplateSymbol(shape, family);
+
+            if (circled.getDimension(font) == null) {
+                return 1;
+            }
+
+            final BufferedImage img = circled.buildImage(font);
+            binarize(img, constants.binarizationThreshold.getValue());
+            final Rectangle ink = getSlimBounds(img, circled.getFatBounds(font));
+            final int middle = ink.y + (ink.height / 2);
+            int run = 0;
+
+            // The first run of ink along the middle row is the ring's left side
+            for (int x = ink.x; x < (ink.x + ink.width); x++) {
+                if (img.getRGB(x, middle) == FORE) {
+                    run++;
+                } else if (run > 0) {
+                    break;
+                }
+            }
+
+            return Math.max(1, run);
         }
 
         /**
@@ -844,7 +1062,8 @@ public class TemplateFactory
                     img.getWidth(),
                     img.getHeight(),
                     keyPoints,
-                    slimBounds);
+                    slimBounds,
+                    strokeSlack);
 
             // Add specific anchor points, if any
             addAnchors(tpl, slimBounds);
@@ -1036,7 +1255,7 @@ public class TemplateFactory
         final int pointSize;
 
         /** Map of all templates for this catalog. */
-        final Map<Shape, Template> templates = new EnumMap<>(Shape.class);
+        final Map<Shape, List<Template>> templates = new EnumMap<>(Shape.class);
 
         /**
          * Create a <code>Catalog</code> object.
@@ -1059,8 +1278,27 @@ public class TemplateFactory
                     family,
                     pointSize);
 
+            // A circled head is engraved two ways. A font draws the ring the width of a plain
+            // head, shrinking the head to fit inside it; engravers more often ring a head of
+            // normal size, which puts the ring clear of it. Both are built and the page decides
+            // which it drew.
             for (Shape shape : ShapeSet.Heads) {
-                templates.put(shape, new Builder(shape, family, pointSize).buildTemplate());
+                final List<Template> list = new ArrayList<>();
+                add(list, new Builder(shape, family, pointSize, false).buildTemplate());
+
+                if (RINGED.containsKey(shape)) {
+                    add(list, new Builder(shape, family, pointSize, true).buildRingedTemplate());
+                }
+
+                templates.put(shape, list);
+            }
+        }
+
+        private static void add (List<Template> list,
+                                 Template template)
+        {
+            if (template != null) {
+                list.add(template);
             }
         }
 
@@ -1072,7 +1310,23 @@ public class TemplateFactory
          */
         public Template getTemplate (Shape shape)
         {
-            return templates.get(shape);
+            final List<Template> list = templates.get(shape);
+
+            return ((list == null) || list.isEmpty()) ? null : list.get(0);
+        }
+
+        /**
+         * Report every template for the given shape, the shape being perhaps engraved
+         * at more than one size.
+         *
+         * @param shape desired shape
+         * @return the templates to try, never empty for a shape the font can draw
+         */
+        public List<Template> getTemplates (Shape shape)
+        {
+            final List<Template> list = templates.get(shape);
+
+            return (list == null) ? Collections.emptyList() : list;
         }
     }
 
@@ -1122,6 +1376,10 @@ public class TemplateFactory
                 "pixels",
                 2,
                 "Minimum number of foreground pixels for slim bounds");
+
+        private final Constant.Ratio circleRatio = new Constant.Ratio(
+                1.3,
+                "How much wider than a font's own circled head engravers ring a full-size one");
 
         private final Constant.Integer maxRawDistanceFromSymbol = new Constant.Integer(
                 "distance",

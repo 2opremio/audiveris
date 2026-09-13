@@ -112,6 +112,9 @@ public class Template
     /** Collection of key points lazily computed for this template. */
     private List<PixelDistance> keyPoints;
 
+    /** Whether the page may draw this template's strokes thinner than the font does. */
+    private final boolean strokeSlack;
+
     //~ Constructors -------------------------------------------------------------------------------
 
     /**
@@ -122,8 +125,9 @@ public class Template
      * @param pointSize  scaling factor
      * @param width      template width
      * @param height     template height
-     * @param keyPoints  the set of defining points
-     * @param slimBounds symbol slim bounds WRT template bounds
+     * @param keyPoints   the set of defining points
+     * @param slimBounds  symbol slim bounds WRT template bounds
+     * @param strokeSlack whether the page may draw the strokes thinner than the font
      */
     public Template (Shape shape,
                      MusicFamily family,
@@ -131,7 +135,8 @@ public class Template
                      int width,
                      int height,
                      List<PixelDistance> keyPoints,
-                     Rectangle slimBounds)
+                     Rectangle slimBounds,
+                     boolean strokeSlack)
     {
         this.shape = shape;
         this.family = family;
@@ -140,6 +145,7 @@ public class Template
         this.width = width;
         this.height = height;
         this.slimBounds = slimBounds;
+        this.strokeSlack = strokeSlack;
     }
 
     //~ Methods ------------------------------------------------------------------------------------
@@ -231,9 +237,15 @@ public class Template
                     // pix.d > 0 for expected background, expected distance to nearest foreground
                     double weight = (pix.d == 0) ? foreWeight
                             : ((pix.d > 0) ? backWeight : holeWeight);
-                    double expected = (pix.d == 0) ? 0 : 1;
-                    double actual = (actualDist == 0) ? 0 : 1;
-                    double dist = Math.abs(actual - expected);
+                    // An expected foreground pixel is satisfied by ink anywhere within its
+                    // own stroke: what an engraving varies is how wide it draws a stroke, not
+                    // where the stroke runs.
+                    final double dist;
+                    if (pix.d == 0) {
+                        dist = (actualDist <= pix.slack) ? 0 : 1;
+                    } else {
+                        dist = (actualDist == 0) ? 1 : 0;
+                    }
 
                     total += (weight * dist);
                     weights += weight;
@@ -463,7 +475,7 @@ public class Template
     public List<PixelDistance> getKeyPoints ()
     {
         if (keyPoints == null) {
-            keyPoints = TemplateFactory.retrieveKeyPoints(shape, family, pointSize);
+            keyPoints = TemplateFactory.retrieveKeyPoints(shape, family, pointSize, strokeSlack);
         }
 
         return keyPoints;

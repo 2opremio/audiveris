@@ -476,20 +476,20 @@ public class NoteHeadsBuilder
     /**
      * Try to create the interpretation that corresponds to the match found.
      *
-     * @param loc    (valued) location of the match
+     * @param match  the template match found
      * @param anchor position of location WRT shape
      * @param shape  the shape tested
      * @param staff  the related staff
      * @param pitch  the head pitch
      * @return the head inter created, if any
      */
-    private HeadInter createInter (PixelDistance loc,
+    private HeadInter createInter (Match match,
                                    Anchor anchor,
                                    Shape shape,
                                    Staff staff,
                                    double pitch)
     {
-        final double distImpact = Template.impactOf(loc.d);
+        final double distImpact = Template.impactOf(match.loc.d);
         final GradeImpacts impacts = new HeadInter.Impacts(distImpact);
         final double grade = impacts.getGrade();
 
@@ -498,8 +498,7 @@ public class NoteHeadsBuilder
             return null;
         }
 
-        final Template template = catalog.getTemplate(shape);
-        final Rectangle box = template.getSlimBoundsAt(loc.x, loc.y, anchor);
+        final Rectangle box = match.template.getSlimBoundsAt(match.loc.x, match.loc.y, anchor);
 
         return new HeadInter(box, shape, impacts, staff, pitch);
     }
@@ -1731,51 +1730,58 @@ public class NoteHeadsBuilder
          * @param anchor find of pivot WRT template
          * @return measured distance
          */
-        private PixelDistance eval (Shape shape,
-                                    int x,
-                                    int y,
-                                    Anchor anchor)
+        private Match eval (Shape shape,
+                            int x,
+                            int y,
+                            Anchor anchor)
         {
-            final Template template = catalog.getTemplate(shape);
-            final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
+            Match best = null;
 
-            // Skip if frozen barline/connector is too close
-            if (barInvolved(slimBox)) {
-                if (useSeeds) {
-                    seedsPerf.bars++;
-                } else {
-                    rangePerf.bars++;
+            // A shape the page can engrave at more than one size has a template for each
+            for (Template template : catalog.getTemplates(shape)) {
+                final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
+
+                // Skip if frozen barline/connector is too close
+                if (barInvolved(slimBox)) {
+                    if (useSeeds) {
+                        seedsPerf.bars++;
+                    } else {
+                        rangePerf.bars++;
+                    }
+
+                    continue;
                 }
 
-                return null;
-            }
+                // Skip if location already used by really good object (beam, etc)
+                if (overlap(slimBox, competitors)) {
+                    if (useSeeds) {
+                        seedsPerf.overlaps++;
+                    } else {
+                        rangePerf.overlaps++;
+                    }
 
-            // Skip if location already used by really good object (beam, etc)
-            if (overlap(slimBox, competitors)) {
-                if (useSeeds) {
-                    seedsPerf.overlaps++;
-                } else {
-                    rangePerf.overlaps++;
+                    continue;
                 }
 
-                return null;
+                double dist = template.evaluate(x, y, anchor, distances);
+
+                // Trick to boost cross heads
+                if (shape == Shape.NOTEHEAD_CROSS) {
+                    dist *= (1 - constants.crossBoost.getValue());
+                }
+
+                if (useSeeds) {
+                    seedsPerf.evals++;
+                } else {
+                    rangePerf.evals++;
+                }
+
+                if ((best == null) || (dist < best.loc.d)) {
+                    best = new Match(new PixelDistance(x, y, dist), template);
+                }
             }
 
-            // Then try (all variants for) the shape and keep the best dist
-            double dist = template.evaluate(x, y, anchor, distances);
-
-            // Trick to boost cross heads
-            if (shape == Shape.NOTEHEAD_CROSS) {
-                dist *= (1 - constants.crossBoost.getValue());
-            }
-
-            if (useSeeds) {
-                seedsPerf.evals++;
-            } else {
-                rangePerf.evals++;
-            }
-
-            return new PixelDistance(x, y, dist);
+            return best;
         }
 
         //-----------------//
@@ -1995,20 +2001,20 @@ public class NoteHeadsBuilder
 
                 ShapeLoop:
                 for (Shape shape : shapeSet) {
-                    PixelDistance bestLoc = null;
+                    Match best = null;
 
                     for (int yOffset : yOffsets) {
                         final int y = y0 + yOffset;
-                        PixelDistance loc = eval(shape, x0, y, MIDDLE_LEFT);
+                        Match match = eval(shape, x0, y, MIDDLE_LEFT);
 
-                        if ((loc != null) && (loc.d <= params.maxDistanceLow)) {
-                            if ((bestLoc == null) || (bestLoc.d > loc.d)) {
-                                bestLoc = loc;
+                        if ((match != null) && (match.loc.d <= params.maxDistanceLow)) {
+                            if ((best == null) || (best.loc.d > match.loc.d)) {
+                                best = match;
                             }
                         } else if (y == y0) {
                             // This is the very first (best guess) location tried.
                             // If eval is really bad, stop immediately
-                            if ((loc == null) || (loc.d >= params.reallyBadDistance)) {
+                            if ((match == null) || (match.loc.d >= params.reallyBadDistance)) {
                                 rangePerf.abandons++;
 
                                 continue ShapeLoop;
@@ -2016,10 +2022,10 @@ public class NoteHeadsBuilder
                         }
                     }
 
-                    if (bestLoc != null) {
+                    if (best != null) {
                         // Special case: NOTEHEAD_VOID mistaken for NOTEHEAD_BLACK
                         if (shape == Shape.NOTEHEAD_BLACK) {
-                            Shape newShape = evalBlackAsVoid(bestLoc.x, bestLoc.y, MIDDLE_LEFT);
+                            Shape newShape = evalBlackAsVoid(best.loc.x, best.loc.y, MIDDLE_LEFT);
 
                             if (newShape != null) {
                                 shape = newShape;
@@ -2027,12 +2033,12 @@ public class NoteHeadsBuilder
                         }
 
                         // Weak stemless heads can be discarded immediately
-                        if (isWeakStemLessHead(shape, bestLoc)) {
+                        if (isWeakStemLessHead(shape, best.loc)) {
                             continue;
                         }
 
                         final HeadInter head = createInter(
-                                bestLoc,
+                                best,
                                 MIDDLE_LEFT,
                                 shape,
                                 line.getStaff(),
@@ -2107,7 +2113,7 @@ public class NoteHeadsBuilder
                     // keep the best match (if acceptable) among all locations tried.
                     ShapeLoop:
                     for (Shape shape : scannerTemplateNotesStem) {
-                        PixelDistance bestLoc = null;
+                        Match best = null;
 
                         // Brute force: explore the whole rectangle around (x0, y0)
                         for (int yOffset : yOffsets) {
@@ -2115,16 +2121,17 @@ public class NoteHeadsBuilder
 
                             for (int xOffset : xOffsets) {
                                 final int x = x0 + xOffset;
-                                final PixelDistance loc = eval(shape, x, y, anchor);
+                                final Match match = eval(shape, x, y, anchor);
 
-                                if ((loc != null) && (loc.d <= params.maxDistanceLow)) {
-                                    if ((bestLoc == null) || (bestLoc.d > loc.d)) {
-                                        bestLoc = loc;
+                                if ((match != null) && (match.loc.d <= params.maxDistanceLow)) {
+                                    if ((best == null) || (best.loc.d > match.loc.d)) {
+                                        best = match;
                                     }
                                 } else if ((x == x0) && (y == y0)) {
                                     // This is the very first (best guess) location tried.
                                     // If eval is really bad, stop immediately
-                                    if ((loc == null) || (loc.d >= params.reallyBadDistance)) {
+                                    if ((match == null)
+                                            || (match.loc.d >= params.reallyBadDistance)) {
                                         seedsPerf.abandons++;
 
                                         continue ShapeLoop;
@@ -2133,13 +2140,13 @@ public class NoteHeadsBuilder
                             }
                         }
 
-                        if (bestLoc == null) {
+                        if (best == null) {
                             continue;
                         }
 
                         // Special case: NOTEHEAD_VOID mistaken for NOTEHEAD_BLACK
                         if (shape == Shape.NOTEHEAD_BLACK) {
-                            final Shape newShape = evalBlackAsVoid(bestLoc.x, bestLoc.y, anchor);
+                            final Shape newShape = evalBlackAsVoid(best.loc.x, best.loc.y, anchor);
 
                             if (newShape != null) {
                                 shape = newShape;
@@ -2147,7 +2154,7 @@ public class NoteHeadsBuilder
                         }
 
                         final HeadInter head = createInter(
-                                bestLoc,
+                                best,
                                 anchor,
                                 shape,
                                 line.getStaff(),
@@ -2156,8 +2163,7 @@ public class NoteHeadsBuilder
                             continue;
                         }
 
-                        final Template template = catalog.getTemplate(shape);
-                        final Glyph glyph = head.retrieveGlyph(template, image);
+                        final Glyph glyph = head.retrieveGlyph(best.template, image);
 
                         if (glyph == null) {
                             continue;
@@ -2182,6 +2188,31 @@ public class NoteHeadsBuilder
             }
 
             return heads;
+        }
+    }
+
+    //-------//
+    // Match //
+    //-------//
+    /**
+     * The best a template did at one location, and which template that was.
+     * <p>
+     * A shape can be engraved at more than one size, so which template matched decides the
+     * head's bounds as much as where it matched.
+     */
+    private static class Match
+    {
+        /** Where the template was tried, and how far it was from the ink there. */
+        final PixelDistance loc;
+
+        /** The template that reached that distance. */
+        final Template template;
+
+        Match (PixelDistance loc,
+               Template template)
+        {
+            this.loc = loc;
+            this.template = template;
         }
     }
 
