@@ -1284,11 +1284,13 @@ public class TemplateFactory
             // which it drew.
             for (Shape shape : ShapeSet.Heads) {
                 final List<Template> list = new ArrayList<>();
-                add(list, new Builder(shape, family, pointSize, false).buildTemplate());
-
-                if (RINGED.containsKey(shape)) {
-                    add(list, new Builder(shape, family, pointSize, true).buildRingedTemplate());
-                }
+                // A cross is drawn as strokes and an engraving varies their weight far
+                // more than where they run: the same Bravura template grades one chart's
+                // crosses at 0.19 and another's at 0.73, and the ones below the floor are
+                // heads nobody builds. A circled head is left alone, its ring lying along
+                // the arms of the cross it rings, where any slack makes the two the same.
+                final boolean drawn = ShapeSet.HeadsCross.contains(shape);
+                add(list, new Builder(shape, family, pointSize, drawn).buildTemplate());
 
                 templates.put(shape, list);
             }
