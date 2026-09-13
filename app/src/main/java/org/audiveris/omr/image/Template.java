@@ -203,12 +203,15 @@ public class Template
      * @param y         pivot location ordinate
      * @param anchor    pivot offset if any, WRT template upper left
      * @param distances the distance table to use
+     * @param onAStem   whether a stem corroborates a head here, which is what
+     *                  buys a keypoint the slack it carries
      * @return the weighted average distance computed on all template key positions
      */
     public double evaluate (int x,
                             int y,
                             Anchor anchor,
-                            DistanceTable distances)
+                            DistanceTable distances,
+                            boolean onAStem)
     {
         final Point ul = upperLeft(x, y, anchor);
 
@@ -239,10 +242,15 @@ public class Template
                             : ((pix.d > 0) ? backWeight : holeWeight);
                     // An expected foreground pixel is satisfied by ink anywhere within its
                     // own stroke: what an engraving varies is how wide it draws a stroke, not
-                    // where the stroke runs.
+                    // where the stroke runs. Only where a stem says a head is there, though.
+                    // A measure-repeat sign is a slash with a dot above it and below it, which
+                    // is where a cross's other two arms end, and a template loose enough to
+                    // read a thin cross reads that too; a head's ink is erased before the
+                    // symbol step looks, so the sign goes with it. Every cross head on a drum
+                    // chart hangs off a stem and no repeat sign does.
                     final double dist;
                     if (pix.d == 0) {
-                        dist = (actualDist <= pix.slack) ? 0 : 1;
+                        dist = (actualDist <= (onAStem ? pix.slack : 0)) ? 0 : 1;
                     } else {
                         dist = (actualDist == 0) ? 1 : 0;
                     }

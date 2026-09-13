@@ -1808,7 +1808,7 @@ public class NoteHeadsBuilder
                     continue;
                 }
 
-                double dist = template.evaluate(x, y, anchor, distances);
+                double dist = template.evaluate(x, y, anchor, distances, useSeeds);
 
                 // Trick to boost cross heads
                 if (shape == Shape.NOTEHEAD_CROSS) {
