@@ -42,7 +42,6 @@ import static org.audiveris.omr.util.HorizontalSide.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Composite;
 import java.awt.Font;
@@ -88,18 +87,6 @@ public class TemplateFactory
 {
     //~ Static fields/initializers -----------------------------------------------------------------
 
-    /**
-     * The head each circled shape is a ring around.
-     * <p>
-     * A font draws a circled head as one glyph, its cross shrunk to keep the whole the width of
-     * a plain head. Engravers ring a head of normal size instead, so the ring is what moves and
-     * the head inside it is the ordinary one, which is how the second template is built.
-     */
-    private static final Map<Shape, Shape> RINGED = Map.of(
-            NOTEHEAD_CIRCLE_X, NOTEHEAD_CROSS,
-            NOTEHEAD_CIRCLE_X_VOID, NOTEHEAD_CROSS_VOID,
-            WHOLE_NOTE_CIRCLE_X, WHOLE_NOTE_CROSS,
-            BREVE_CIRCLE_X, BREVE_CROSS);
 
     private static final Constants constants = new Constants();
 
@@ -923,107 +910,6 @@ public class TemplateFactory
             }
 
             return keyPoints;
-        }
-
-        /**
-         * Build a template for a circled head drawn the way engravers draw one: the plain head
-         * at its ordinary size, with a ring around it.
-         * <p>
-         * The font's own circled head shrinks the head to keep the ring the width of a plain
-         * one, which puts the ring along the arms of the very cross it is meant to tell apart.
-         * Drawn this way the ring circumscribes the head instead, so its ink is somewhere a
-         * plain head has none.
-         *
-         * @return the brand new template, or null if the font cannot draw the plain head
-         */
-        public Template buildRingedTemplate ()
-        {
-            final MusicFont font = MusicFont.getMusicFont(family, pointSize);
-            final TemplateSymbol plain = new TemplateSymbol(RINGED.get(shape), family);
-
-            if (plain.getDimension(font) == null) {
-                logger.info("{} No template for {}", family, shape);
-
-                return null;
-            }
-
-            final BufferedImage head = plain.buildImage(font);
-            binarize(head, constants.binarizationThreshold.getValue());
-            final Rectangle headInk = getSlimBounds(head, plain.getFatBounds(font));
-
-            // The ring passes through the head's own corners, which is where an engraver puts it
-            final double diameter = Math.hypot(headInk.width, headInk.height);
-            final int stroke = ringStroke(font);
-            final int room = 2 * (int) Math.ceil(maxDistanceFromSymbol(pointSize));
-            final int side = (int) Math.ceil(diameter + stroke) + room;
-
-            final BufferedImage img = new BufferedImage(side, side, BufferedImage.TYPE_INT_RGB);
-            final Graphics2D g = img.createGraphics();
-            g.setColor(new Color(BACK));
-            g.fillRect(0, 0, side, side);
-
-            // The head sits at the centre, the ring around it
-            g.drawImage(head,
-                        (side / 2) - (headInk.x + headInk.width / 2),
-                        (side / 2) - (headInk.y + headInk.height / 2),
-                        null);
-            g.setColor(new Color(FORE));
-            g.setStroke(new BasicStroke(stroke));
-            g.draw(new Ellipse2D.Double((side - diameter) / 2, (side - diameter) / 2,
-                                        diameter, diameter));
-            g.dispose();
-
-            final Rectangle fatBounds = new Rectangle(
-                    (int) Math.rint((side - diameter - stroke) / 2),
-                    (int) Math.rint((side - diameter - stroke) / 2),
-                    (int) Math.ceil(diameter + stroke),
-                    (int) Math.ceil(diameter + stroke));
-            final Rectangle slimBounds = getSlimBounds(img, fatBounds);
-            final Template tpl = new Template(shape, family, pointSize, side, side,
-                                              buildKeyPoints(buildDistances(img, fatBounds)),
-                                              slimBounds, strokeSlack);
-            addAnchors(tpl, slimBounds);
-
-            if (constants.saveTemplates.isSet()) {
-                ImageUtil.saveOnDisk(buildDecoratedImage(tpl),
-                                     "templates-" + family + "-" + pointSize + "-ringed",
-                                     shape.name());
-            }
-
-            return tpl;
-        }
-
-        /**
-         * Report how wide a stroke the font draws its own ring with, so the drawn one is no
-         * lighter or heavier than the engraving the font was fitted to.
-         *
-         * @param font the font at this template's size
-         * @return the ring stroke, in pixels, at least one
-         */
-        private int ringStroke (MusicFont font)
-        {
-            final TemplateSymbol circled = new TemplateSymbol(shape, family);
-
-            if (circled.getDimension(font) == null) {
-                return 1;
-            }
-
-            final BufferedImage img = circled.buildImage(font);
-            binarize(img, constants.binarizationThreshold.getValue());
-            final Rectangle ink = getSlimBounds(img, circled.getFatBounds(font));
-            final int middle = ink.y + (ink.height / 2);
-            int run = 0;
-
-            // The first run of ink along the middle row is the ring's left side
-            for (int x = ink.x; x < (ink.x + ink.width); x++) {
-                if (img.getRGB(x, middle) == FORE) {
-                    run++;
-                } else if (run > 0) {
-                    break;
-                }
-            }
-
-            return Math.max(1, run);
         }
 
         /**
