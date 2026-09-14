@@ -168,6 +168,28 @@ public class NoteHeadsBuilder
         MATCHED_SHAPES.addAll(ShapeSet.HalfHeads);
     }
 
+    /**
+     * The matched heads a font draws as a stroke rather than as a blob.
+     * <p>
+     * An oval is a filled or hollow blob whatever cut it, and a distance
+     * transform reads it the same from any font. A cross, a diamond, a triangle
+     * and a circled cross are their stroke: its angle and its weight are the
+     * glyph, and they differ from font to font. So these are the heads, and the
+     * only heads, that a family besides the sheet's own is asked about.
+     * <p>
+     * Restricting it to them is what makes asking safe. Head ink is erased
+     * before the symbols are read, so a family that matches one oval differently
+     * moves what every later step sees: over the library, cutting every template
+     * from Bravura and Finale Jazz both lost 20 of one chart's 829 ovals, and
+     * with them a measure, a jump and the worst measure box, which went from
+     * 0.150% to 3.937%.
+     */
+    private static final Set<Shape> STROKE_SHAPES = EnumSet.copyOf(MATCHED_SHAPES);
+    static {
+        STROKE_SHAPES.removeAll(ShapeSet.HeadsOval);
+        STROKE_SHAPES.removeAll(ShapeSet.HeadsOvalSmall);
+    }
+
     //~ Instance fields ----------------------------------------------------------------------------
 
     /** The dedicated system. */
@@ -351,7 +373,7 @@ public class NoteHeadsBuilder
      */
     public void buildHeads ()
     {
-        final MusicFamily family = headFamily();
+        final MusicFamily family = sheet.getStub().getMusicFamily();
         final StopWatch watch = new StopWatch("buildHeads S#" + system.getId());
         systemBarAreas = getSystemBarAreas();
         systemBarlineAreas = getSystemBarlineAreas();
@@ -373,8 +395,9 @@ public class NoteHeadsBuilder
             final int pointSize = staff.getHeadPointSize();
             catalog = TemplateFactory.getInstance().getCatalog(family, pointSize);
             catalogs = new ArrayList<>();
+            catalogs.add(catalog);
 
-            for (MusicFamily one : headFamilies()) {
+            for (MusicFamily one : strokeHeadFamilies()) {
                 catalogs.add(TemplateFactory.getInstance().getCatalog(one, pointSize));
             }
 
@@ -745,32 +768,28 @@ public class NoteHeadsBuilder
     // getSystemCompetitors //
     //----------------------//
     /**
-     * Report the music family the head templates are built from.
+     * Report the families to cut stroke-head templates from besides the sheet's
+     * own, which is always the first one tried.
      * <p>
-     * A head template is built from a music font and Audiveris uses the sheet's
-     * own family for every symbol it draws. That is right for an oval, which is
-     * a filled blob under a distance transform whatever drew it, and wrong for a
-     * cross, whose stroke angle and weight are the glyph: the same Bravura
-     * template grades one chart's crosses at 0.190 and another's at 0.728.
+     * A cross, a diamond, a triangle and a circled cross are their stroke, and
+     * its angle and weight are what the font decides: the same Bravura template
+     * grades one chart's crosses at 0.190 and another's at 0.728. An oval is a
+     * blob under a distance transform whatever drew it, so it is matched against
+     * the sheet's own family alone and is never asked about here.
      * <p>
-     * Changing the sheet's family moves everything that renders a symbol, which
-     * costs measures and signs. This is that choice scoped to the head templates
-     * and nothing else, so the symbols, the clefs and the OCR keep the family
-     * the sheet chose.
+     * The sheet's own family is dropped from whatever is asked for, since it is
+     * already the first catalog. An unknown name is named in the log rather than
+     * passed over, because a misspelt family would otherwise read as a setting
+     * that did nothing.
      *
-     * @return the family to build head templates from
+     * @return the extra families, in the order asked for, possibly empty
      */
-    private List<MusicFamily> headFamilies ()
+    private List<MusicFamily> strokeHeadFamilies ()
     {
-        final String asked = constants.headFamily.getValue().trim();
-
-        if (asked.isEmpty()) {
-            return List.of(sheet.getStub().getMusicFamily());
-        }
-
+        final MusicFamily own = sheet.getStub().getMusicFamily();
         final List<MusicFamily> families = new ArrayList<>();
 
-        for (String name : asked.split(",")) {
+        for (String name : constants.strokeHeadFamilies.getValue().split(",")) {
             final String wanted = name.trim();
 
             if (wanted.isEmpty()) {
@@ -788,17 +807,12 @@ public class NoteHeadsBuilder
 
             if (found == null) {
                 logger.warn("Unknown head template family {}, skipped", wanted);
-            } else if (!families.contains(found)) {
+            } else if (found != own && !families.contains(found)) {
                 families.add(found);
             }
         }
 
-        return families.isEmpty() ? List.of(sheet.getStub().getMusicFamily()) : families;
-    }
-
-    private MusicFamily headFamily ()
-    {
-        return headFamilies().get(0);
+        return families;
     }
 
     /**
@@ -1373,10 +1387,10 @@ public class NoteHeadsBuilder
                 0, // Was 0.38,
                 "How much do we boost stem-less heads (always isolated)");
 
-        private final Constant.String headFamily = new Constant.String(
+        private final Constant.String strokeHeadFamilies = new Constant.String(
                 "",
-                "Music families for head templates alone, comma separated, "
-                + "empty for the sheet's own");
+                "Music families to also cut cross, diamond, triangle and circled "
+                + "cross head templates from, comma separated, besides the sheet's own");
 
         private final Constant.Ratio minInkHeight = new Constant.Ratio(
                 0.75,
@@ -1922,11 +1936,14 @@ public class NoteHeadsBuilder
         {
             Match best = null;
 
-            // A shape the page can engrave at more than one size has a template for
-            // each, and one cut from each music family asked for: a page is
-            // engraved in one font and Audiveris is rarely told which, so the
-            // best fit over the families is taken rather than one guessed at.
-            for (Catalog one : catalogs) {
+            // A shape the page can engrave at more than one size has a template
+            // for each. A stroke head also has one per family asked for, and the
+            // best fit over them all is taken: a cross is its stroke and fonts
+            // cut that differently. An oval is matched against the sheet's own
+            // family alone, so that what is erased before the symbols are read
+            // does not move with the setting. See STROKE_SHAPES.
+            for (Catalog one : STROKE_SHAPES.contains(shape)
+                    ? catalogs : List.of(catalog)) {
             for (Template template : one.getTemplates(shape)) {
                 final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
 
