@@ -194,6 +194,9 @@ public class NoteHeadsBuilder
     /** The forbidden areas around connectors and frozen barlines. */
     private List<Area> systemBarAreas;
 
+    /** Areas of every barline, frozen or not, where a template gets no slack. */
+    private List<Area> systemBarlineAreas;
+
     /** The vertical (stem) seeds for the system. */
     private List<Glyph> systemSeeds;
 
@@ -335,6 +338,7 @@ public class NoteHeadsBuilder
         final MusicFamily family = sheet.getStub().getMusicFamily();
         final StopWatch watch = new StopWatch("buildHeads S#" + system.getId());
         systemBarAreas = getSystemBarAreas();
+        systemBarlineAreas = getSystemBarlineAreas();
         systemCompetitors = getSystemCompetitors(); // Competitors
         systemSeeds = system.getGroupedGlyphs(GlyphGroup.VERTICAL_SEED); // Vertical seeds
         Collections.sort(systemSeeds, Glyphs.byOrdinate);
@@ -686,6 +690,31 @@ public class NoteHeadsBuilder
         for (Inter inter : inters) {
             AbstractVerticalInter vertical = (AbstractVerticalInter) inter;
             areas.add(vertical.getArea());
+        }
+
+        return areas;
+    }
+
+    //-----------------------//
+    // getSystemBarlineAreas //
+    //-----------------------//
+    /**
+     * Report the area of every barline, whether or not it is frozen.
+     * <p>
+     * Not to keep heads off them, which would settle the competition a barline has
+     * with a stem before it is fought: a barline that is only a candidate has to be
+     * free to lose to a real note. Only to withhold the slack a stroke is granted,
+     * so a head there has to be as convincing as it was before.
+     *
+     * @return the barline areas
+     */
+    private List<Area> getSystemBarlineAreas ()
+    {
+        final List<Area> areas = new ArrayList<>();
+
+        for (Inter inter : sig.inters(
+                inter -> inter instanceof BarlineInter || inter instanceof BarConnectorInter)) {
+            areas.add(((AbstractVerticalInter) inter).getArea());
         }
 
         return areas;
@@ -1499,6 +1528,9 @@ public class NoteHeadsBuilder
 
         private final List<Area> barAreas;
 
+        /** Every barline near this line, where no keypoint gets its slack. */
+        private final List<Area> barlineAreas;
+
         private final List<LedgerAdapter> ledgers;
 
         private List<HeadInter> heads = new ArrayList<>();
@@ -1568,6 +1600,7 @@ public class NoteHeadsBuilder
                 final double below = ((interline * dir) / 2.0) + params.vBarMargin;
                 Area barsArea = line.getArea(above, below);
                 barAreas = getBarAreas(barsArea);
+                barlineAreas = getBarlineAreas(barsArea);
             }
 
             if (constants.allowAttachments.isSet()) {
@@ -1600,6 +1633,26 @@ public class NoteHeadsBuilder
                     dumpShapeList(pitch, "hollow", scannerTemplateNotesHollow);
                 }
             }
+        }
+
+        //-------------//
+        // onABarline //
+        //-------------//
+        /**
+         * Check whether the provided rectangle sits on a barline of any kind.
+         *
+         * @param rect provided rectangle
+         * @return true if a barline is drawn there
+         */
+        private boolean onABarline (Rectangle rect)
+        {
+            for (Area a : barlineAreas) {
+                if (a.intersects(rect)) {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         //-------------//
@@ -1812,7 +1865,12 @@ public class NoteHeadsBuilder
                     continue;
                 }
 
-                double dist = template.evaluate(x, y, anchor, distances, useSeeds);
+                // No slack where a barline is: its ink reads as a stem, and the
+                // digits of the time signature beside it then read as the heads
+                // hanging off it. A head there must be as convincing as it was
+                // before the slack existed.
+                final boolean loose = useSeeds && !onABarline(slimBox);
+                double dist = template.evaluate(x, y, anchor, distances, loose);
 
                 // Trick to boost cross heads
                 if (shape == Shape.NOTEHEAD_CROSS) {
@@ -1867,6 +1925,17 @@ public class NoteHeadsBuilder
          *
          * @return the bar-centered areas
          */
+        private List<Area> getBarlineAreas (Area area)
+        {
+            List<Area> kept = new ArrayList<>();
+            for (Area r : systemBarlineAreas) {
+                if (area.intersects(r.getBounds())) {
+                    kept.add(r);
+                }
+            }
+            return kept;
+        }
+
         private List<Area> getBarAreas (Area area)
         {
             List<Area> kept = new ArrayList<>();
