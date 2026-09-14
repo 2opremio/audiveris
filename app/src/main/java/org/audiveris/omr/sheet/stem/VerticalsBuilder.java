@@ -41,12 +41,8 @@ import org.audiveris.omr.sheet.SystemInfo;
 import org.audiveris.omr.sheet.ui.SheetAssembly;
 import org.audiveris.omr.sheet.ui.SheetTab;
 import org.audiveris.omr.sig.GradeImpacts;
-import org.audiveris.omr.sig.inter.BarlineInter;
-import org.audiveris.omr.sig.inter.Inter;
 import org.audiveris.omr.step.StepException;
 import org.audiveris.omr.ui.selection.EntityService;
-
-import java.awt.Rectangle;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -163,15 +159,6 @@ public class VerticalsBuilder
                 continue;
             }
 
-            // A barline is not a stem. Left to become a seed, its ink is what a
-            // head then hangs off: on one chart a thin barline became the stem of
-            // two cross heads matched on the digits of the time signature beside
-            // it, and erasing their ink took the barline, the signature and the
-            // measure behind it.
-            if (onABarline(stick)) {
-                continue;
-            }
-
             // Run the stem checks
             final Glyph glyph = glyphIndex.registerOriginal(stick.toGlyph(null));
             GradeImpacts impacts = stemChecker.checkStem(stick);
@@ -185,28 +172,6 @@ public class VerticalsBuilder
         }
 
         logger.debug("{}verticals: {}", system.getLogPrefix(), seedNb);
-    }
-
-    //------------//
-    // onABarline //
-    //------------//
-    /**
-     * Report whether a vertical stick is the ink of a barline.
-     *
-     * @param stick the candidate seed
-     * @return true if a barline is drawn there
-     */
-    private boolean onABarline (StraightFilament stick)
-    {
-        final Rectangle box = stick.getBounds();
-
-        for (Inter inter : system.getSig().inters(BarlineInter.class)) {
-            if (inter.getBounds().intersects(box)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     //--------------------//
