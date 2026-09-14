@@ -2101,9 +2101,12 @@ public class NoteHeadsBuilder
                                         Template template,
                                         ByteProcessor image)
         {
-            final double reach = template.getWidth() * constants.centreRadius.getValue();
-            final double cx = (template.getWidth() - 1) / 2.0;
-            final double cy = (template.getHeight() - 1) / 2.0;
+            // The shape's own middle, not the template box's: a head template is
+            // wider than its head, carrying the anchors a stem attaches at.
+            final Rectangle shape = template.getSlimBounds();
+            final double reach = shape.width * constants.centreRadius.getValue();
+            final double cx = shape.x + (shape.width - 1) / 2.0;
+            final double cy = shape.y + (shape.height - 1) / 2.0;
             int wanted = 0;
             int found = 0;
 
