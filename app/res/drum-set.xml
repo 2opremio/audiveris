@@ -68,11 +68,17 @@
     <!-- -7 -->
     <entry pitch-position="-7" motif="cross"   sound="Crash_Cymbal_2"/>
     <entry pitch-position="-7" motif="circle"  sound="Crash_Cymbal_2"/>
+    <!-- Charts draw a filled triangle up here for a crash, and the set lists
+         the motif at -3 and -2 alone, inside the staff, so no triangle template
+         is ever tried above it. The Hives prints twelve on one score and the
+         reading finds none. -->
+    <entry pitch-position="-7" motif="triangle" sound="Crash_Cymbal_2"/>
     
     <!-- -6 -->
     <entry pitch-position="-6" motif="cross"   sound="Crash_Cymbal_1"/>
     <entry pitch-position="-6" motif="circle"  sound="Crash_Cymbal_1"/>
     <entry pitch-position="-6" motif="diamond" sound="Crash_Cymbal_1"/>
+    <entry pitch-position="-6" motif="triangle" sound="Crash_Cymbal_1"/>
     
     <!-- -5 -->
     <entry pitch-position="-5" motif="cross"    sign="PLAYING_OPEN"   sound="Open_Hi_Hat"/>
