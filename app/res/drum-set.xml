@@ -68,6 +68,14 @@
     <!-- -7 -->
     <entry pitch-position="-7" motif="cross"   sound="Crash_Cymbal_2"/>
     <entry pitch-position="-7" motif="circle"  sound="Crash_Cymbal_2"/>
+    <!-- A chart that plays a pedal above the kit writes it as a solid down
+         triangle on a ledger up here, one a beat. Without the entry no triangle
+         template is tried on the slot and the cross wins every one of them:
+         Legalize Living reads 241 crosses there and draws 182 triangles. The
+         charts that write a real crash X on the same slot are untouched by it,
+         Song For The Dead's 261, Anarchy In The UK's 155 and The Pretender's
+         166 coming back the same to the head. -->
+    <entry pitch-position="-7" motif="triangle" sound="Pedal_Hi_Hat"/>
     
     <!-- -6 -->
     <entry pitch-position="-6" motif="cross"   sound="Crash_Cymbal_1"/>
