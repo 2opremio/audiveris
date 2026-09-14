@@ -68,7 +68,6 @@
     <!-- -7 -->
     <entry pitch-position="-7" motif="cross"   sound="Crash_Cymbal_2"/>
     <entry pitch-position="-7" motif="circle"  sound="Crash_Cymbal_2"/>
-    <entry pitch-position="-7" motif="triangle" sound="Crash_Cymbal_2"/>
     
     <!-- -6 -->
     <entry pitch-position="-6" motif="cross"   sound="Crash_Cymbal_1"/>
