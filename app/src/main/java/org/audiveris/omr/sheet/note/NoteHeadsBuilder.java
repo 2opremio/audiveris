@@ -35,7 +35,6 @@ import static org.audiveris.omr.image.Anchored.Anchor.LEFT_STEM;
 import static org.audiveris.omr.image.Anchored.Anchor.MIDDLE_LEFT;
 import static org.audiveris.omr.image.Anchored.Anchor.RIGHT_STEM;
 import org.audiveris.omr.image.ChamferDistance;
-import org.audiveris.omr.image.PixelDistance;
 import org.audiveris.omr.image.DistanceTable;
 import org.audiveris.omr.image.PixelDistance;
 import org.audiveris.omr.image.Template;
@@ -1313,10 +1312,6 @@ public class NoteHeadsBuilder
                 0.75,
                 "Least of a template's height a head's own ink may stand");
 
-        private final Constant.Ratio minInkArea = new Constant.Ratio(
-                0.70,
-                "Least of a template's own ink a head's ink may fill");
-
         private final Constant.Ratio crossBoost = new Constant.Ratio(
                 0.0, // Was 0.1,
                 "How much do we boost cross heads (badly recognized by template matching)");
@@ -2071,35 +2066,7 @@ public class NoteHeadsBuilder
             final int drawn = head.getBounds().height;
             final int expected = template.getSlimBounds().height;
 
-            if (drawn < expected * constants.minInkHeight.getValue()) {
-                return false;
-            }
-
-            // And as much of the shape as the shape is made of. A template
-            // reports a distance, so ink near where it wants ink still grades
-            // well, and a hollow glyph under a solid template passes on that:
-            // Anarchy in the U.K. draws its hi-hat by hand and 144 of its
-            // crosses came back as filled diamonds, the diamond covering the
-            // two strokes of the X and finding paper at the four corners it
-            // wants filled. The glyph is built from the image ink lying under
-            // the template's own foreground, so its weight against the count
-            // of that foreground is how much of the shape is really drawn.
-            final Glyph glyph = head.getGlyph();
-
-            if (glyph == null) {
-                return true;
-            }
-
-            int wanted = 0;
-
-            for (PixelDistance pix : template.getKeyPoints()) {
-                if (pix.d == 0) {
-                    wanted++;
-                }
-            }
-
-            return (wanted == 0)
-                    || (glyph.getWeight() >= wanted * constants.minInkArea.getValue());
+            return drawn >= expected * constants.minInkHeight.getValue();
         }
 
         //--------------------//
