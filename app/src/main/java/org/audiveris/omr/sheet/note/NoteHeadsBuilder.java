@@ -201,6 +201,9 @@ public class NoteHeadsBuilder
     /** The <b>properly scaled</b> templates to use, based on <b>current</b> staff. */
     private Catalog catalog;
 
+    /** Template catalogs to match against, one per music family asked for. */
+    private List<Catalog> catalogs;
+
     /** The competing interpretations for the system. */
     private List<Inter> systemCompetitors;
 
@@ -369,6 +372,11 @@ public class NoteHeadsBuilder
             watch.start("Staff #" + staff.getId() + " catalog");
             final int pointSize = staff.getHeadPointSize();
             catalog = TemplateFactory.getInstance().getCatalog(family, pointSize);
+            catalogs = new ArrayList<>();
+
+            for (MusicFamily one : headFamilies()) {
+                catalogs.add(TemplateFactory.getInstance().getCatalog(one, pointSize));
+            }
 
             final List<HeadInter> ch = new ArrayList<>(); // Created Heads, for this staff
 
@@ -752,21 +760,45 @@ public class NoteHeadsBuilder
      *
      * @return the family to build head templates from
      */
-    private MusicFamily headFamily ()
+    private List<MusicFamily> headFamilies ()
     {
-        final String chosen = constants.headFamily.getValue().trim();
+        final String asked = constants.headFamily.getValue().trim();
 
-        if (!chosen.isEmpty()) {
+        if (asked.isEmpty()) {
+            return List.of(sheet.getStub().getMusicFamily());
+        }
+
+        final List<MusicFamily> families = new ArrayList<>();
+
+        for (String name : asked.split(",")) {
+            final String wanted = name.trim();
+
+            if (wanted.isEmpty()) {
+                continue;
+            }
+
+            MusicFamily found = null;
+
             for (MusicFamily family : MusicFamily.values()) {
-                if (family.name().equalsIgnoreCase(chosen)) {
-                    return family;
+                if (family.name().equalsIgnoreCase(wanted)) {
+                    found = family;
+                    break;
                 }
             }
 
-            logger.warn("Unknown head template family {}, using the sheet's", chosen);
+            if (found == null) {
+                logger.warn("Unknown head template family {}, skipped", wanted);
+            } else if (!families.contains(found)) {
+                families.add(found);
+            }
         }
 
-        return sheet.getStub().getMusicFamily();
+        return families.isEmpty() ? List.of(sheet.getStub().getMusicFamily()) : families;
+    }
+
+    private MusicFamily headFamily ()
+    {
+        return headFamilies().get(0);
     }
 
     /**
@@ -1343,7 +1375,8 @@ public class NoteHeadsBuilder
 
         private final Constant.String headFamily = new Constant.String(
                 "",
-                "Music family for head templates alone, empty for the sheet's own");
+                "Music families for head templates alone, comma separated, "
+                + "empty for the sheet's own");
 
         private final Constant.Ratio minInkHeight = new Constant.Ratio(
                 0.75,
@@ -1889,8 +1922,12 @@ public class NoteHeadsBuilder
         {
             Match best = null;
 
-            // A shape the page can engrave at more than one size has a template for each
-            for (Template template : catalog.getTemplates(shape)) {
+            // A shape the page can engrave at more than one size has a template for
+            // each, and one cut from each music family asked for: a page is
+            // engraved in one font and Audiveris is rarely told which, so the
+            // best fit over the families is taken rather than one guessed at.
+            for (Catalog one : catalogs) {
+            for (Template template : one.getTemplates(shape)) {
                 final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
 
                 // Skip if frozen barline/connector is too close
@@ -1936,6 +1973,7 @@ public class NoteHeadsBuilder
                 if ((best == null) || (dist < best.loc.d)) {
                     best = new Match(new PixelDistance(x, y, dist), template);
                 }
+            }
             }
 
             return best;
