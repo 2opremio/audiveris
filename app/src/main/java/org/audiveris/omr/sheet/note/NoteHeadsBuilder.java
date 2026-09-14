@@ -348,7 +348,7 @@ public class NoteHeadsBuilder
      */
     public void buildHeads ()
     {
-        final MusicFamily family = sheet.getStub().getMusicFamily();
+        final MusicFamily family = headFamily();
         final StopWatch watch = new StopWatch("buildHeads S#" + system.getId());
         systemBarAreas = getSystemBarAreas();
         systemBarlineAreas = getSystemBarlineAreas();
@@ -736,6 +736,39 @@ public class NoteHeadsBuilder
     //----------------------//
     // getSystemCompetitors //
     //----------------------//
+    /**
+     * Report the music family the head templates are built from.
+     * <p>
+     * A head template is built from a music font and Audiveris uses the sheet's
+     * own family for every symbol it draws. That is right for an oval, which is
+     * a filled blob under a distance transform whatever drew it, and wrong for a
+     * cross, whose stroke angle and weight are the glyph: the same Bravura
+     * template grades one chart's crosses at 0.190 and another's at 0.728.
+     * <p>
+     * Changing the sheet's family moves everything that renders a symbol, which
+     * costs measures and signs. This is that choice scoped to the head templates
+     * and nothing else, so the symbols, the clefs and the OCR keep the family
+     * the sheet chose.
+     *
+     * @return the family to build head templates from
+     */
+    private MusicFamily headFamily ()
+    {
+        final String chosen = constants.headFamily.getValue().trim();
+
+        if (!chosen.isEmpty()) {
+            for (MusicFamily family : MusicFamily.values()) {
+                if (family.name().equalsIgnoreCase(chosen)) {
+                    return family;
+                }
+            }
+
+            logger.warn("Unknown head template family {}, using the sheet's", chosen);
+        }
+
+        return sheet.getStub().getMusicFamily();
+    }
+
     /**
      * Retrieve the collection of (really good) other interpretations that might compete
      * with head candidates.
@@ -1307,6 +1340,10 @@ public class NoteHeadsBuilder
         private final Constant.Ratio stemLessBoost = new Constant.Ratio(
                 0, // Was 0.38,
                 "How much do we boost stem-less heads (always isolated)");
+
+        private final Constant.String headFamily = new Constant.String(
+                "",
+                "Music family for head templates alone, empty for the sheet's own");
 
         private final Constant.Ratio minInkHeight = new Constant.Ratio(
                 0.75,
