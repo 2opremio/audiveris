@@ -35,6 +35,7 @@ import static org.audiveris.omr.image.Anchored.Anchor.LEFT_STEM;
 import static org.audiveris.omr.image.Anchored.Anchor.MIDDLE_LEFT;
 import static org.audiveris.omr.image.Anchored.Anchor.RIGHT_STEM;
 import org.audiveris.omr.image.ChamferDistance;
+import org.audiveris.omr.image.PixelDistance;
 import org.audiveris.omr.image.DistanceTable;
 import org.audiveris.omr.image.PixelDistance;
 import org.audiveris.omr.image.Template;
@@ -1312,6 +1313,14 @@ public class NoteHeadsBuilder
                 0.75,
                 "Least of a template's height a head's own ink may stand");
 
+        private final Constant.Ratio centreRadius = new Constant.Ratio(
+                0.25,
+                "How much of a template's width counts as its centre");
+
+        private final Constant.Ratio minCentreInk = new Constant.Ratio(
+                0.5,
+                "Least of a template's inked centre a head must draw");
+
         private final Constant.Ratio crossBoost = new Constant.Ratio(
                 0.0, // Was 0.1,
                 "How much do we boost cross heads (badly recognized by template matching)");
@@ -2069,6 +2078,60 @@ public class NoteHeadsBuilder
             return drawn >= expected * constants.minInkHeight.getValue();
         }
 
+        //---------------//
+        // fillsItsCentre //
+        //---------------//
+        /**
+         * Report whether a head draws ink where its template's own centre is inked.
+         *
+         * The centre is what tells a cross from a hollow diamond: one crosses
+         * itself there and the other is paper. A distance table does not settle
+         * it, both shapes running ink along the same four diagonals, and El
+         * Valle's ride bell comes back as a cross 88 times out of 118.
+         *
+         * Only a template whose centre is inked asks anything here. A hollow
+         * head's own template wants paper there and is never held to this.
+         *
+         * @param box      where the template sits in the image
+         * @param template the template that found the head
+         * @param image    the sheet's binary image
+         * @return true if the centre the template inks is inked on the page
+         */
+        private boolean fillsItsCentre (Rectangle box,
+                                        Template template,
+                                        ByteProcessor image)
+        {
+            final double reach = template.getWidth() * constants.centreRadius.getValue();
+            final double cx = (template.getWidth() - 1) / 2.0;
+            final double cy = (template.getHeight() - 1) / 2.0;
+            int wanted = 0;
+            int found = 0;
+
+            for (PixelDistance pix : template.getKeyPoints()) {
+                if (pix.d != 0) {
+                    continue;
+                }
+
+                if (Math.hypot(pix.x - cx, pix.y - cy) > reach) {
+                    continue;
+                }
+
+                wanted++;
+
+                final int x = box.x + pix.x;
+                final int y = box.y + pix.y;
+
+                if ((x >= 0) && (x < image.getWidth())
+                        && (y >= 0) && (y < image.getHeight())
+                        && (image.get(x, y) == 0)) {
+                    found++;
+                }
+            }
+
+            return (wanted == 0)
+                    || (found >= wanted * constants.minCentreInk.getValue());
+        }
+
         //--------------------//
         // isWeakStemLessHead //
         //--------------------//
@@ -2220,7 +2283,9 @@ public class NoteHeadsBuilder
                 final Template template = catalog.getTemplate(inter.getShape());
                 final Glyph glyph = inter.retrieveGlyph(template, image);
 
-                if (glyph != null && fillsItsShape(inter, template)) {
+                if (glyph != null && fillsItsShape(inter, template)
+                        && fillsItsCentre(template.getBounds(inter.getBounds()),
+                                          template, image)) {
                     sig.addVertex(inter);
                 } else {
                     it.remove();
@@ -2323,7 +2388,10 @@ public class NoteHeadsBuilder
 
                         final Glyph glyph = head.retrieveGlyph(best.template, image);
 
-                        if (glyph == null || !fillsItsShape(head, best.template)) {
+                        if (glyph == null || !fillsItsShape(head, best.template)
+                                || !fillsItsCentre(
+                                        best.template.getBounds(head.getBounds()),
+                                        best.template, image)) {
                             continue;
                         }
 
