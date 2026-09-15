@@ -550,17 +550,6 @@ public class NoteHeadsBuilder
 
         final Rectangle box = match.template.getSlimBoundsAt(match.loc.x, match.loc.y, anchor);
 
-        // A head drawn on a barline has to be a good one, not merely an
-        // acceptable one. Heads are not kept off an unfrozen barline outright,
-        // so that a barline which is only a candidate stays free to lose to a
-        // real note, and a real note is what it has to lose to: Losing My
-        // Religion reads a cross of grade 0.162 on the thick bar opening a
-        // repeat, and the bar that bar opens comes out split in two around it,
-        // which is the score's only invented measure and its worst measure box.
-        if ((grade < Grades.goodInterGrade) && onABarline(box)) {
-            return null;
-        }
-
         return new HeadInter(box, shape, impacts, staff, pitch);
     }
 
@@ -729,26 +718,6 @@ public class NoteHeadsBuilder
         }
 
         return list;
-    }
-
-    //-------------//
-    // onABarline //
-    //-------------//
-    /**
-     * Whether a barline of any kind is drawn where this rectangle sits.
-     *
-     * @param rect the rectangle to check
-     * @return true if a barline is drawn there
-     */
-    private boolean onABarline (Rectangle rect)
-    {
-        for (Area area : systemBarlineAreas) {
-            if (area.intersects(rect)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     //-------------------//
