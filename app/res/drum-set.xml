@@ -103,7 +103,13 @@
     <entry pitch-position="-3" motif="oval"     sound="Hi_Mid_Tom"/>
     <entry pitch-position="-3" motif="cross"    sound="Open_Hi_Hat"/>
     <entry pitch-position="-3" motif="circle"   sound="Open_Hi_Hat"/>
-    <entry pitch-position="-3" motif="triangle" sound="Cowbell"/>
+    <!-- No triangle here. Upstream lists a cowbell on the slot and no chart in
+         the library writes one: every triangle the entry finds is drawn on
+         something else. Himno Generacional No 83 gives up seven of them off
+         rests, In Bloom one off a tuplet's 6, Mentiras and May 16 three off bar
+         numbers, El Valle three off time signatures and Come Together one off
+         the words "and one". The triangle above the staff at -7 is real and
+         stays; this one only ever takes ink from something that is not a head. -->
     
     <!-- -2 -->
     <entry pitch-position="-2" motif="oval"     sound="Low_Mid_Tom"/>
