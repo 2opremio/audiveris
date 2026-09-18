@@ -62,6 +62,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 import javax.xml.bind.JAXBContext;
@@ -155,6 +156,14 @@ public class BasicClassifier
     {
         // Get a brand new one (not trained)
         logger.info("Creating a brand new {}", getName());
+
+        // Weights are random, so two trainings on the same samples give two different
+        // networks. Seeding them is half of what makes a run repeatable; the other
+        // half is the sample order, seeded from the same constant in train().
+        if (constants.trainingSeed.getValue() != 0) {
+            NeuralNetwork.setSeed(constants.trainingSeed.getValue());
+            logger.info("Weights seeded with {}", constants.trainingSeed.getValue());
+        }
 
         // We allocate a hidden layer with as many cells as the output layer
         return new NeuralNetwork(
@@ -598,9 +607,12 @@ public class BasicClassifier
         final StopWatch watch = new StopWatch("train");
         watch.start("shuffle");
 
-        // Shuffle the collection of samples
+        // Shuffle the collection of samples. The order the samples arrive in moves
+        // the network as much as its initial weights do, so a seed has to fix both
+        // for a training run to be repeatable.
         final List<Sample> newSamples = new ArrayList<>(samples);
-        Collections.shuffle(newSamples);
+        final int seed = constants.trainingSeed.getValue();
+        Collections.shuffle(newSamples, (seed != 0) ? new Random(seed) : new Random());
 
         // Build raw dataset
         watch.start("getRawDataSet");
@@ -776,6 +788,12 @@ public class BasicClassifier
                 "Internal iteration period",
                 1,
                 "Period to trigger the internal listener");
+
+        private final Constant.Integer trainingSeed = new Constant.Integer(
+                "Seed",
+                0,
+                "Seed for the initial weights and the sample order, 0 to start from"
+                        + " a different network on every training");
     }
 
     //---------------//
