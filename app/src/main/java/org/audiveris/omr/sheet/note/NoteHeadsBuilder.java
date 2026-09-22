@@ -397,10 +397,6 @@ public class NoteHeadsBuilder
             catalogs = new ArrayList<>();
             catalogs.add(catalog);
 
-            for (MusicFamily one : strokeHeadFamilies()) {
-                catalogs.add(TemplateFactory.getInstance().getCatalog(one, pointSize));
-            }
-
             final List<HeadInter> ch = new ArrayList<>(); // Created Heads, for this staff
 
             // First, process all seed-based heads for the staff
@@ -767,54 +763,6 @@ public class NoteHeadsBuilder
     //----------------------//
     // getSystemCompetitors //
     //----------------------//
-    /**
-     * Report the families to cut stroke-head templates from besides the sheet's
-     * own, which is always the first one tried.
-     * <p>
-     * A cross, a diamond, a triangle and a circled cross are their stroke, and
-     * its angle and weight are what the font decides: the same Bravura template
-     * grades one chart's crosses at 0.190 and another's at 0.728. An oval is a
-     * blob under a distance transform whatever drew it, so it is matched against
-     * the sheet's own family alone and is never asked about here.
-     * <p>
-     * The sheet's own family is dropped from whatever is asked for, since it is
-     * already the first catalog. An unknown name is named in the log rather than
-     * passed over, because a misspelt family would otherwise read as a setting
-     * that did nothing.
-     *
-     * @return the extra families, in the order asked for, possibly empty
-     */
-    private List<MusicFamily> strokeHeadFamilies ()
-    {
-        final MusicFamily own = sheet.getStub().getMusicFamily();
-        final List<MusicFamily> families = new ArrayList<>();
-
-        for (String name : constants.strokeHeadFamilies.getValue().split(",")) {
-            final String wanted = name.trim();
-
-            if (wanted.isEmpty()) {
-                continue;
-            }
-
-            MusicFamily found = null;
-
-            for (MusicFamily family : MusicFamily.values()) {
-                if (family.name().equalsIgnoreCase(wanted)) {
-                    found = family;
-                    break;
-                }
-            }
-
-            if (found == null) {
-                logger.warn("Unknown head template family {}, skipped", wanted);
-            } else if (found != own && !families.contains(found)) {
-                families.add(found);
-            }
-        }
-
-        return families;
-    }
-
     /**
      * Retrieve the collection of (really good) other interpretations that might compete
      * with head candidates.
@@ -1386,11 +1334,6 @@ public class NoteHeadsBuilder
         private final Constant.Ratio stemLessBoost = new Constant.Ratio(
                 0, // Was 0.38,
                 "How much do we boost stem-less heads (always isolated)");
-
-        private final Constant.String strokeHeadFamilies = new Constant.String(
-                "",
-                "Music families to also cut cross, diamond, triangle and circled "
-                + "cross head templates from, comma separated, besides the sheet's own");
 
         private final Constant.Ratio minInkHeight = new Constant.Ratio(
                 0.75,

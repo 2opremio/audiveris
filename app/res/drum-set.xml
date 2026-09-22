@@ -68,12 +68,6 @@
     <!-- -7 -->
     <entry pitch-position="-7" motif="cross"   sound="Crash_Cymbal_2"/>
     <entry pitch-position="-7" motif="circle"  sound="Crash_Cymbal_2"/>
-    <!-- No triangle here either, for now. Legalize Living draws 182 of them on a
-         ledger above the staff and the entry reads 182, but only while the head
-         templates are also cut from Finale Jazz: with the sheet's own family
-         alone the same entry takes 68 of Anarchy In The UK's crash X's, which
-         are X's on the page. The two ship together or not at all, and the font
-         was measured over the library and taken out. -->
     
     <!-- -6 -->
     <entry pitch-position="-6" motif="cross"   sound="Crash_Cymbal_1"/>
@@ -85,11 +79,6 @@
     <entry pitch-position="-5" motif="circle"                         sound="Open_Hi_Hat"/>
     <entry pitch-position="-5" motif="cross"    sign="PLAYING_CLOSED" sound="Closed_Hi_Hat"/>   
     <entry pitch-position="-5" motif="cross"                          sound="Closed_Hi_Hat"/>
-    <!-- Charts that hang the hi-hat above the staff draw a diamond there to let
-         it ring, as the circle beside it does: 1,368 heads over 16 of 95 drum
-         charts. Without the entry no diamond template is tried on the slot and
-         the cross wins every one of them. -->
-    <entry pitch-position="-5" motif="diamond"                        sound="Open_Hi_Hat"/>
 
     <!-- -4 -->
     <entry pitch-position="-4" motif="oval"     sound="High_Tom"/>
@@ -101,13 +90,7 @@
     <entry pitch-position="-3" motif="oval"     sound="Hi_Mid_Tom"/>
     <entry pitch-position="-3" motif="cross"    sound="Open_Hi_Hat"/>
     <entry pitch-position="-3" motif="circle"   sound="Open_Hi_Hat"/>
-    <!-- No triangle here. Upstream lists a cowbell on the slot and no chart in
-         the library writes one: every triangle the entry finds is drawn on
-         something else. Himno Generacional No 83 gives up seven of them off
-         rests, In Bloom one off a tuplet's 6, Mentiras and May 16 three off bar
-         numbers, El Valle three off time signatures and Come Together one off
-         the words "and one". The triangle above the staff at -7 is real and
-         stays; this one only ever takes ink from something that is not a head. -->
+    <entry pitch-position="-3" motif="triangle" sound="Cowbell"/>
     
     <!-- -2 -->
     <entry pitch-position="-2" motif="oval"     sound="Low_Mid_Tom"/>
@@ -145,8 +128,6 @@
     <!-- w/ open sign -> foot splash -->
     <entry pitch-position="5" motif="cross"     sound="Pedal_Hi_Hat"/>
     <entry pitch-position="5" motif="circle"    sound="Open_Hi_Hat"/>
-    <!-- Charts that hang the hi-hat above the staff drop the bass drum below it -->
-    <entry pitch-position="5" motif="oval"      sound="Acoustic_Bass_Drum"/>
     
 <!--
     Here below is the list of not yet assigned sounds
