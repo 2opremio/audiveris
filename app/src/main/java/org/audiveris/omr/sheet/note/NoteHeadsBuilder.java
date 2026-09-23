@@ -146,11 +146,21 @@ public class NoteHeadsBuilder
             Shape.TREMOLO_3,
             Shape.VERTICAL_SERIF);
 
-    /** Shapes handled by template matching. */
+    /**
+     * Shapes handled by template matching.
+     * <p>
+     * The oval is here in all four of its durations and every other motif used to be
+     * here in its filled quarter alone, so a drum staff could match a half note but
+     * not a half cymbal.
+     * <p>
+     * The stem-less heads are deliberately not here with them: over a library of drum
+     * charts they cost 125 heads of one chart's 609 and reach 7 whole heads in all.
+     */
     private static final Set<Shape> MATCHED_SHAPES = EnumSet.noneOf(Shape.class);
     static {
         MATCHED_SHAPES.addAll(ShapeSet.HeadsOval);
         MATCHED_SHAPES.addAll(ShapeSet.QuarterHeads);
+        MATCHED_SHAPES.addAll(ShapeSet.HalfHeads);
     }
 
     //~ Instance fields ----------------------------------------------------------------------------
