@@ -168,28 +168,6 @@ public class NoteHeadsBuilder
         MATCHED_SHAPES.addAll(ShapeSet.HalfHeads);
     }
 
-    /**
-     * The matched heads a font draws as a stroke rather than as a blob.
-     * <p>
-     * An oval is a filled or hollow blob whatever cut it, and a distance
-     * transform reads it the same from any font. A cross, a diamond, a triangle
-     * and a circled cross are their stroke: its angle and its weight are the
-     * glyph, and they differ from font to font. So these are the heads, and the
-     * only heads, that a family besides the sheet's own is asked about.
-     * <p>
-     * Restricting it to them is what makes asking safe. Head ink is erased
-     * before the symbols are read, so a family that matches one oval differently
-     * moves what every later step sees: over the library, cutting every template
-     * from Bravura and Finale Jazz both lost 20 of one chart's 829 ovals, and
-     * with them a measure, a jump and the worst measure box, which went from
-     * 0.150% to 3.937%.
-     */
-    private static final Set<Shape> STROKE_SHAPES = EnumSet.copyOf(MATCHED_SHAPES);
-    static {
-        STROKE_SHAPES.removeAll(ShapeSet.HeadsOval);
-        STROKE_SHAPES.removeAll(ShapeSet.HeadsOvalSmall);
-    }
-
     //~ Instance fields ----------------------------------------------------------------------------
 
     /** The dedicated system. */
@@ -222,9 +200,6 @@ public class NoteHeadsBuilder
 
     /** The <b>properly scaled</b> templates to use, based on <b>current</b> staff. */
     private Catalog catalog;
-
-    /** Template catalogs to match against, one per music family asked for. */
-    private List<Catalog> catalogs;
 
     /** The competing interpretations for the system. */
     private List<Inter> systemCompetitors;
@@ -394,8 +369,6 @@ public class NoteHeadsBuilder
             watch.start("Staff #" + staff.getId() + " catalog");
             final int pointSize = staff.getHeadPointSize();
             catalog = TemplateFactory.getInstance().getCatalog(family, pointSize);
-            catalogs = new ArrayList<>();
-            catalogs.add(catalog);
 
             final List<HeadInter> ch = new ArrayList<>(); // Created Heads, for this staff
 
@@ -1880,14 +1853,8 @@ public class NoteHeadsBuilder
             Match best = null;
 
             // A shape the page can engrave at more than one size has a template
-            // for each. A stroke head also has one per family asked for, and the
-            // best fit over them all is taken: a cross is its stroke and fonts
-            // cut that differently. An oval is matched against the sheet's own
-            // family alone, so that what is erased before the symbols are read
-            // does not move with the setting. See STROKE_SHAPES.
-            for (Catalog one : STROKE_SHAPES.contains(shape)
-                    ? catalogs : List.of(catalog)) {
-            for (Template template : one.getTemplates(shape)) {
+            // for each.
+            for (Template template : catalog.getTemplates(shape)) {
                 final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
 
                 // Skip if frozen barline/connector is too close
@@ -1933,7 +1900,6 @@ public class NoteHeadsBuilder
                 if ((best == null) || (dist < best.loc.d)) {
                     best = new Match(new PixelDistance(x, y, dist), template);
                 }
-            }
             }
 
             return best;
