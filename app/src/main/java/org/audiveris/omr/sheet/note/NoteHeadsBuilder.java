@@ -51,12 +51,14 @@ import org.audiveris.omr.run.Orientation;
 import org.audiveris.omr.score.DrumSet;
 import org.audiveris.omr.score.DrumSet.DrumInstrument;
 import org.audiveris.omr.sheet.Part;
+import org.audiveris.omr.sheet.ProcessingSwitch;
 import org.audiveris.omr.sheet.Picture;
 import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.Sheet;
 import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sheet.SystemInfo;
 import org.audiveris.omr.sheet.grid.LineInfo;
+import org.audiveris.omr.sheet.header.StaffHeader;
 import org.audiveris.omr.sig.GradeImpacts;
 import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractBeamInter;
@@ -146,11 +148,24 @@ public class NoteHeadsBuilder
             Shape.TREMOLO_3,
             Shape.VERTICAL_SERIF);
 
-    /** Shapes handled by template matching. */
+    /**
+     * Shapes handled by template matching.
+     * <p>
+     * The oval is here in all four of its durations and every other motif used
+     * to be here in its filled quarter alone, so a drum staff could match a
+     * half note but not a half cymbal. Over 95 drum charts that is 861 half
+     * heads the reading could not reach whatever it did: 417 of them are the
+     * hollow diamond charts draw on the hi-hat line to let it ring, and the
+     * cross template won every one of them.
+     * <p>
+     * The stem-less heads are deliberately not here with them. Adding those
+     * costs 125 heads of one chart's 609 and reaches 7 whole heads in all.
+     */
     private static final Set<Shape> MATCHED_SHAPES = EnumSet.noneOf(Shape.class);
     static {
         MATCHED_SHAPES.addAll(ShapeSet.HeadsOval);
         MATCHED_SHAPES.addAll(ShapeSet.QuarterHeads);
+        MATCHED_SHAPES.addAll(ShapeSet.HalfHeads);
     }
 
     //~ Instance fields ----------------------------------------------------------------------------
@@ -191,6 +206,9 @@ public class NoteHeadsBuilder
 
     /** The forbidden areas around connectors and frozen barlines. */
     private List<Area> systemBarAreas;
+
+    /** Areas of every barline, frozen or not, where a template gets no slack. */
+    private List<Area> systemBarlineAreas;
 
     /** The vertical (stem) seeds for the system. */
     private List<Glyph> systemSeeds;
@@ -333,6 +351,7 @@ public class NoteHeadsBuilder
         final MusicFamily family = sheet.getStub().getMusicFamily();
         final StopWatch watch = new StopWatch("buildHeads S#" + system.getId());
         systemBarAreas = getSystemBarAreas();
+        systemBarlineAreas = getSystemBarlineAreas();
         systemCompetitors = getSystemCompetitors(); // Competitors
         systemSeeds = system.getGroupedGlyphs(GlyphGroup.VERTICAL_SEED); // Vertical seeds
         Collections.sort(systemSeeds, Glyphs.byOrdinate);
@@ -476,20 +495,20 @@ public class NoteHeadsBuilder
     /**
      * Try to create the interpretation that corresponds to the match found.
      *
-     * @param loc    (valued) location of the match
+     * @param match  the template match found
      * @param anchor position of location WRT shape
      * @param shape  the shape tested
      * @param staff  the related staff
      * @param pitch  the head pitch
      * @return the head inter created, if any
      */
-    private HeadInter createInter (PixelDistance loc,
+    private HeadInter createInter (Match match,
                                    Anchor anchor,
                                    Shape shape,
                                    Staff staff,
                                    double pitch)
     {
-        final double distImpact = Template.impactOf(loc.d);
+        final double distImpact = Template.impactOf(match.loc.d);
         final GradeImpacts impacts = new HeadInter.Impacts(distImpact);
         final double grade = impacts.getGrade();
 
@@ -498,8 +517,7 @@ public class NoteHeadsBuilder
             return null;
         }
 
-        final Template template = catalog.getTemplate(shape);
-        final Rectangle box = template.getSlimBoundsAt(loc.x, loc.y, anchor);
+        final Rectangle box = match.template.getSlimBoundsAt(match.loc.x, match.loc.y, anchor);
 
         return new HeadInter(box, shape, impacts, staff, pitch);
     }
@@ -685,6 +703,31 @@ public class NoteHeadsBuilder
         for (Inter inter : inters) {
             AbstractVerticalInter vertical = (AbstractVerticalInter) inter;
             areas.add(vertical.getArea());
+        }
+
+        return areas;
+    }
+
+    //-----------------------//
+    // getSystemBarlineAreas //
+    //-----------------------//
+    /**
+     * Report the area of every barline, whether or not it is frozen.
+     * <p>
+     * Not to keep heads off them, which would settle the competition a barline has
+     * with a stem before it is fought: a barline that is only a candidate has to be
+     * free to lose to a real note. Only to withhold the slack a stroke is granted,
+     * so a head there has to be as convincing as it was before.
+     *
+     * @return the barline areas
+     */
+    private List<Area> getSystemBarlineAreas ()
+    {
+        final List<Area> areas = new ArrayList<>();
+
+        for (Inter inter : sig.inters(
+                inter -> inter instanceof BarlineInter || inter instanceof BarConnectorInter)) {
+            areas.add(((AbstractVerticalInter) inter).getArea());
         }
 
         return areas;
@@ -1265,6 +1308,10 @@ public class NoteHeadsBuilder
                 0, // Was 0.38,
                 "How much do we boost stem-less heads (always isolated)");
 
+        private final Constant.Ratio minInkHeight = new Constant.Ratio(
+                0.75,
+                "Least of a template's height a head's own ink may stand");
+
         private final Constant.Ratio crossBoost = new Constant.Ratio(
                 0.0, // Was 0.1,
                 "How much do we boost cross heads (badly recognized by template matching)");
@@ -1494,6 +1541,9 @@ public class NoteHeadsBuilder
 
         private final List<Area> barAreas;
 
+        /** Every barline near this line, where no keypoint gets its slack. */
+        private final List<Area> barlineAreas;
+
         private final List<LedgerAdapter> ledgers;
 
         private List<HeadInter> heads = new ArrayList<>();
@@ -1563,6 +1613,7 @@ public class NoteHeadsBuilder
                 final double below = ((interline * dir) / 2.0) + params.vBarMargin;
                 Area barsArea = line.getArea(above, below);
                 barAreas = getBarAreas(barsArea);
+                barlineAreas = getBarlineAreas(barsArea);
             }
 
             if (constants.allowAttachments.isSet()) {
@@ -1598,6 +1649,26 @@ public class NoteHeadsBuilder
         }
 
         //-------------//
+        // onABarline //
+        //-------------//
+        /**
+         * Check whether the provided rectangle sits on a barline of any kind.
+         *
+         * @param rect provided rectangle
+         * @return true if a barline is drawn there
+         */
+        private boolean onABarline (Rectangle rect)
+        {
+            for (Area a : barlineAreas) {
+                if (a.intersects(rect)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        //-------------//
         // barInvolved //
         //-------------//
         /**
@@ -1630,7 +1701,7 @@ public class NoteHeadsBuilder
         {
             final Staff staff = line.getStaff();
 
-            if (!staff.isDrum()) {
+            if (!isUnpitched(staff)) {
                 return sheetTemplateNotesAll;
             }
 
@@ -1664,6 +1735,49 @@ public class NoteHeadsBuilder
             }
 
             return allShapes;
+        }
+
+        //-------------//
+        // isUnpitched //
+        //-------------//
+        /**
+         * Report whether a staff is to be read as unpitched, so that its head
+         * templates are limited to the motifs the drum set lists for each pitch.
+         * <p>
+         * {@link Staff#isDrum()} answers this from a PERCUSSION_CLEF, and a great
+         * many drum charts print no clef at all: the staff opens straight onto its
+         * time signature. Such a staff is taken for pitched, every head template
+         * then competes at every pitch rather than only those the drum set allows,
+         * and the wrong motifs win: a cymbal comes back as a diamond.
+         * <p>
+         * Setting {@code drumNotation} is the user saying what the sheet is, so it
+         * stands in for a clef that was never printed. A staff whose clef
+         * <i>was</i> read and is not a percussion clef stays pitched, so a sheet
+         * carrying a drum staff beside a melodic one is unaffected.
+         * <p>
+         * Asked here rather than inside {@code Staff.isDrum()} because
+         * {@code ClefBuilder} asks that too, while it is still choosing which clef
+         * shapes to look for. A true answer there narrows the candidates to
+         * PERCUSSION_CLEF alone, and the melodic staff above would never find its
+         * own clef. By this step the clef question is settled either way.
+         *
+         * @param staff the staff to test
+         * @return true if its heads are to be looked up in the drum set
+         */
+        private boolean isUnpitched (Staff staff)
+        {
+            if (staff.isDrum()) {
+                return true;
+            }
+
+            final StaffHeader header = staff.getHeader();
+
+            if ((header != null) && (header.clef != null)) {
+                return false;
+            }
+
+            return staff.getSystem().getSheet().getStub().getProcessingSwitches()
+                    .getValue(ProcessingSwitch.drumNotation);
         }
 
         //-----------------//
@@ -1731,51 +1845,64 @@ public class NoteHeadsBuilder
          * @param anchor find of pivot WRT template
          * @return measured distance
          */
-        private PixelDistance eval (Shape shape,
-                                    int x,
-                                    int y,
-                                    Anchor anchor)
+        private Match eval (Shape shape,
+                            int x,
+                            int y,
+                            Anchor anchor)
         {
-            final Template template = catalog.getTemplate(shape);
-            final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
+            Match best = null;
 
-            // Skip if frozen barline/connector is too close
-            if (barInvolved(slimBox)) {
-                if (useSeeds) {
-                    seedsPerf.bars++;
-                } else {
-                    rangePerf.bars++;
+            // A shape the page can engrave at more than one size has a template
+            // for each.
+            for (Template template : catalog.getTemplates(shape)) {
+                final Rectangle slimBox = template.getSlimBoundsAt(x, y, anchor);
+
+                // Skip if frozen barline/connector is too close
+                if (barInvolved(slimBox)) {
+                    if (useSeeds) {
+                        seedsPerf.bars++;
+                    } else {
+                        rangePerf.bars++;
+                    }
+
+                    continue;
                 }
 
-                return null;
-            }
+                // Skip if location already used by really good object (beam, etc)
+                if (overlap(slimBox, competitors)) {
+                    if (useSeeds) {
+                        seedsPerf.overlaps++;
+                    } else {
+                        rangePerf.overlaps++;
+                    }
 
-            // Skip if location already used by really good object (beam, etc)
-            if (overlap(slimBox, competitors)) {
-                if (useSeeds) {
-                    seedsPerf.overlaps++;
-                } else {
-                    rangePerf.overlaps++;
+                    continue;
                 }
 
-                return null;
+                // No slack where a barline is: its ink reads as a stem, and the
+                // digits of the time signature beside it then read as the heads
+                // hanging off it. A head there must be as convincing as it was
+                // before the slack existed.
+                final boolean loose = useSeeds && !onABarline(slimBox);
+                double dist = template.evaluate(x, y, anchor, distances, loose);
+
+                // Trick to boost cross heads
+                if (shape == Shape.NOTEHEAD_CROSS) {
+                    dist *= (1 - constants.crossBoost.getValue());
+                }
+
+                if (useSeeds) {
+                    seedsPerf.evals++;
+                } else {
+                    rangePerf.evals++;
+                }
+
+                if ((best == null) || (dist < best.loc.d)) {
+                    best = new Match(new PixelDistance(x, y, dist), template);
+                }
             }
 
-            // Then try (all variants for) the shape and keep the best dist
-            double dist = template.evaluate(x, y, anchor, distances);
-
-            // Trick to boost cross heads
-            if (shape == Shape.NOTEHEAD_CROSS) {
-                dist *= (1 - constants.crossBoost.getValue());
-            }
-
-            if (useSeeds) {
-                seedsPerf.evals++;
-            } else {
-                rangePerf.evals++;
-            }
-
-            return new PixelDistance(x, y, dist);
+            return best;
         }
 
         //-----------------//
@@ -1812,6 +1939,17 @@ public class NoteHeadsBuilder
          *
          * @return the bar-centered areas
          */
+        private List<Area> getBarlineAreas (Area area)
+        {
+            List<Area> kept = new ArrayList<>();
+            for (Area r : systemBarlineAreas) {
+                if (area.intersects(r.getBounds())) {
+                    kept.add(r);
+                }
+            }
+            return kept;
+        }
+
         private List<Area> getBarAreas (Area area)
         {
             List<Area> kept = new ArrayList<>();
@@ -1905,6 +2043,33 @@ public class NoteHeadsBuilder
             }
         }
 
+        //----------------//
+        // fillsItsShape //
+        //----------------//
+        /**
+         * Report whether the ink a head was built from is as tall as the template
+         * that found it.
+         * <p>
+         * A template reports a distance and the glyph underneath reports its own
+         * bounds, and the two part company where the match is on something else:
+         * the numeral above a measure-repeat sign reads as a cross head half a
+         * head tall, and a head's ink is erased before the symbol step looks, so
+         * the sign goes with it. Over the library 99.8% of heads stand a full
+         * template high and the ones that do not are this.
+         *
+         * @param head     the head just built
+         * @param template the template that found it
+         * @return true if its ink fills the template's height
+         */
+        private boolean fillsItsShape (HeadInter head,
+                                       Template template)
+        {
+            final int drawn = head.getBounds().height;
+            final int expected = template.getSlimBounds().height;
+
+            return drawn >= expected * constants.minInkHeight.getValue();
+        }
+
         //--------------------//
         // isWeakStemLessHead //
         //--------------------//
@@ -1995,20 +2160,20 @@ public class NoteHeadsBuilder
 
                 ShapeLoop:
                 for (Shape shape : shapeSet) {
-                    PixelDistance bestLoc = null;
+                    Match best = null;
 
                     for (int yOffset : yOffsets) {
                         final int y = y0 + yOffset;
-                        PixelDistance loc = eval(shape, x0, y, MIDDLE_LEFT);
+                        Match match = eval(shape, x0, y, MIDDLE_LEFT);
 
-                        if ((loc != null) && (loc.d <= params.maxDistanceLow)) {
-                            if ((bestLoc == null) || (bestLoc.d > loc.d)) {
-                                bestLoc = loc;
+                        if ((match != null) && (match.loc.d <= params.maxDistanceLow)) {
+                            if ((best == null) || (best.loc.d > match.loc.d)) {
+                                best = match;
                             }
                         } else if (y == y0) {
                             // This is the very first (best guess) location tried.
                             // If eval is really bad, stop immediately
-                            if ((loc == null) || (loc.d >= params.reallyBadDistance)) {
+                            if ((match == null) || (match.loc.d >= params.reallyBadDistance)) {
                                 rangePerf.abandons++;
 
                                 continue ShapeLoop;
@@ -2016,10 +2181,10 @@ public class NoteHeadsBuilder
                         }
                     }
 
-                    if (bestLoc != null) {
+                    if (best != null) {
                         // Special case: NOTEHEAD_VOID mistaken for NOTEHEAD_BLACK
                         if (shape == Shape.NOTEHEAD_BLACK) {
-                            Shape newShape = evalBlackAsVoid(bestLoc.x, bestLoc.y, MIDDLE_LEFT);
+                            Shape newShape = evalBlackAsVoid(best.loc.x, best.loc.y, MIDDLE_LEFT);
 
                             if (newShape != null) {
                                 shape = newShape;
@@ -2027,12 +2192,12 @@ public class NoteHeadsBuilder
                         }
 
                         // Weak stemless heads can be discarded immediately
-                        if (isWeakStemLessHead(shape, bestLoc)) {
+                        if (isWeakStemLessHead(shape, best.loc)) {
                             continue;
                         }
 
                         final HeadInter head = createInter(
-                                bestLoc,
+                                best,
                                 MIDDLE_LEFT,
                                 shape,
                                 line.getStaff(),
@@ -2056,7 +2221,7 @@ public class NoteHeadsBuilder
                 final Template template = catalog.getTemplate(inter.getShape());
                 final Glyph glyph = inter.retrieveGlyph(template, image);
 
-                if (glyph != null) {
+                if (glyph != null && fillsItsShape(inter, template)) {
                     sig.addVertex(inter);
                 } else {
                     it.remove();
@@ -2107,7 +2272,7 @@ public class NoteHeadsBuilder
                     // keep the best match (if acceptable) among all locations tried.
                     ShapeLoop:
                     for (Shape shape : scannerTemplateNotesStem) {
-                        PixelDistance bestLoc = null;
+                        Match best = null;
 
                         // Brute force: explore the whole rectangle around (x0, y0)
                         for (int yOffset : yOffsets) {
@@ -2115,16 +2280,17 @@ public class NoteHeadsBuilder
 
                             for (int xOffset : xOffsets) {
                                 final int x = x0 + xOffset;
-                                final PixelDistance loc = eval(shape, x, y, anchor);
+                                final Match match = eval(shape, x, y, anchor);
 
-                                if ((loc != null) && (loc.d <= params.maxDistanceLow)) {
-                                    if ((bestLoc == null) || (bestLoc.d > loc.d)) {
-                                        bestLoc = loc;
+                                if ((match != null) && (match.loc.d <= params.maxDistanceLow)) {
+                                    if ((best == null) || (best.loc.d > match.loc.d)) {
+                                        best = match;
                                     }
                                 } else if ((x == x0) && (y == y0)) {
                                     // This is the very first (best guess) location tried.
                                     // If eval is really bad, stop immediately
-                                    if ((loc == null) || (loc.d >= params.reallyBadDistance)) {
+                                    if ((match == null)
+                                            || (match.loc.d >= params.reallyBadDistance)) {
                                         seedsPerf.abandons++;
 
                                         continue ShapeLoop;
@@ -2133,13 +2299,13 @@ public class NoteHeadsBuilder
                             }
                         }
 
-                        if (bestLoc == null) {
+                        if (best == null) {
                             continue;
                         }
 
                         // Special case: NOTEHEAD_VOID mistaken for NOTEHEAD_BLACK
                         if (shape == Shape.NOTEHEAD_BLACK) {
-                            final Shape newShape = evalBlackAsVoid(bestLoc.x, bestLoc.y, anchor);
+                            final Shape newShape = evalBlackAsVoid(best.loc.x, best.loc.y, anchor);
 
                             if (newShape != null) {
                                 shape = newShape;
@@ -2147,7 +2313,7 @@ public class NoteHeadsBuilder
                         }
 
                         final HeadInter head = createInter(
-                                bestLoc,
+                                best,
                                 anchor,
                                 shape,
                                 line.getStaff(),
@@ -2156,10 +2322,9 @@ public class NoteHeadsBuilder
                             continue;
                         }
 
-                        final Template template = catalog.getTemplate(shape);
-                        final Glyph glyph = head.retrieveGlyph(template, image);
+                        final Glyph glyph = head.retrieveGlyph(best.template, image);
 
-                        if (glyph == null) {
+                        if (glyph == null || !fillsItsShape(head, best.template)) {
                             continue;
                         }
 
@@ -2182,6 +2347,31 @@ public class NoteHeadsBuilder
             }
 
             return heads;
+        }
+    }
+
+    //-------//
+    // Match //
+    //-------//
+    /**
+     * The best a template did at one location, and which template that was.
+     * <p>
+     * A shape can be engraved at more than one size, so which template matched decides the
+     * head's bounds as much as where it matched.
+     */
+    private static class Match
+    {
+        /** Where the template was tried, and how far it was from the ink there. */
+        final PixelDistance loc;
+
+        /** The template that reached that distance. */
+        final Template template;
+
+        Match (PixelDistance loc,
+               Template template)
+        {
+            this.loc = loc;
+            this.template = template;
         }
     }
 
