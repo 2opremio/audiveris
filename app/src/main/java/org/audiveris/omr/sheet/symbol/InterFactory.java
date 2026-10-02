@@ -34,12 +34,10 @@ import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sheet.SystemInfo;
 import org.audiveris.omr.sheet.rhythm.MeasureStack;
 import org.audiveris.omr.sheet.time.BasicTimeColumn;
-import org.audiveris.omr.sheet.time.TimeColumn;
 import org.audiveris.omr.sig.SIGraph;
 import org.audiveris.omr.sig.inter.AbstractChordInter;
 import org.audiveris.omr.sig.inter.AbstractFlagInter;
 import org.audiveris.omr.sig.inter.AbstractPauseInter;
-import org.audiveris.omr.sig.inter.AbstractTimeInter;
 import org.audiveris.omr.sig.inter.AlterInter;
 import org.audiveris.omr.sig.inter.ArpeggiatoInter;
 import org.audiveris.omr.sig.inter.ArticulationInter;
@@ -66,7 +64,6 @@ import org.audiveris.omr.sig.inter.GraceChordInter;
 import org.audiveris.omr.sig.inter.HeadChordInter;
 import org.audiveris.omr.sig.inter.HeadInter;
 import org.audiveris.omr.sig.inter.Inter;
-import org.audiveris.omr.sig.inter.InterEnsemble;
 import org.audiveris.omr.sig.inter.Inters;
 import org.audiveris.omr.sig.inter.KeyInter;
 import org.audiveris.omr.sig.inter.LedgerInter;
@@ -100,11 +97,8 @@ import org.audiveris.omr.util.Navigable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.awt.Rectangle;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -734,38 +728,9 @@ public class InterFactory
             }
         }
 
-        // Finally, scan each stack populated with some time sig(s)
+        // Finally, scan each stack: a validated time sig discards the overlapping stuff itself
         for (Entry<MeasureStack, Set<Inter>> entry : timeMap.entrySet()) {
-            final MeasureStack stack = entry.getKey();
-            final TimeColumn column = new BasicTimeColumn(stack, entry.getValue());
-            final int res = column.retrieveTime();
-
-            // If the stack does have a validated time sig, discard overlapping stuff right now!
-            if (res != -1) {
-                final Collection<AbstractTimeInter> times = column.getTimeInters().values();
-                final Rectangle columnBox = Inters.getBounds(times);
-                final List<Inter> neighbors = sig.inters(
-                        (inter) -> inter.getBounds().intersects(columnBox)
-                                && !(inter instanceof InterEnsemble));
-
-                neighbors.removeAll(times);
-
-                for (AbstractTimeInter time : times) {
-                    final double timeGrade = time.getGrade();
-
-                    for (Iterator<Inter> it = neighbors.iterator(); it.hasNext();) {
-                        final Inter neighbor = it.next();
-
-                        if (neighbor.overlaps(time) && (neighbor.getGrade() < timeGrade)) {
-                            if (neighbor.isVip()) {
-                                logger.info("VIP Deleting time overlapping {}", neighbor);
-                            }
-                            neighbor.remove();
-                            it.remove();
-                        }
-                    }
-                }
-            }
+            new BasicTimeColumn(entry.getKey(), entry.getValue()).retrieveTime();
         }
     }
 
