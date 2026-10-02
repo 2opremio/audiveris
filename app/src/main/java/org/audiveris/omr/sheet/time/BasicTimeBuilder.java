@@ -21,6 +21,14 @@
 // </editor-fold>
 package org.audiveris.omr.sheet.time;
 
+import org.audiveris.omr.constant.ConstantSet;
+import org.audiveris.omr.glyph.Glyph;
+import org.audiveris.omr.glyph.GlyphFactory;
+import org.audiveris.omr.run.Orientation;
+import org.audiveris.omr.run.RunTable;
+import org.audiveris.omr.run.RunTableFactory;
+import org.audiveris.omr.sheet.Picture;
+import org.audiveris.omr.sheet.Scale;
 import org.audiveris.omr.sheet.Staff;
 import org.audiveris.omr.sheet.header.StaffHeader;
 import org.audiveris.omr.sheet.rhythm.MeasureStack;
@@ -29,6 +37,13 @@ import org.audiveris.omr.sig.inter.TimeNumberInter;
 import org.audiveris.omr.sig.inter.TimeWholeInter;
 import org.audiveris.omr.util.HorizontalSide;
 import org.audiveris.omr.util.VerticalSide;
+
+import ij.process.Blitter;
+import ij.process.ByteProcessor;
+
+import java.awt.Rectangle;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A subclass of TimeBuilder specifically meant for extraction outside system header,
@@ -42,6 +57,10 @@ import org.audiveris.omr.util.VerticalSide;
 public class BasicTimeBuilder
         extends TimeBuilder
 {
+    //~ Static fields/initializers -----------------------------------------------------------------
+
+    private static final Constants constants = new Constants();
+
     //~ Constructors -------------------------------------------------------------------------------
 
     /**
@@ -94,6 +113,48 @@ public class BasicTimeBuilder
     }
 
     //-------------//
+    // leavesStaff //
+    //-------------//
+    /**
+     * Report whether ink through the candidate glyph strays past the staff outer lines.
+     * A time signature is drawn wholly within the staff, so such ink belongs to something
+     * else, such as the stem of a chord opening the measure.
+     *
+     * @param candidate a candidate read at the measure opening
+     * @return true if so
+     */
+    private boolean leavesStaff (Inter candidate)
+    {
+        final Rectangle box = candidate.getGlyph().getBounds();
+        final int x = box.x + (box.width / 2);
+        final int stray = scale.getInterlineScale(staff.getSpecificInterline()).toPixels(
+                constants.maxStray);
+
+        // The band reaches one row past the stray allowed on either side
+        final int top = staff.getFirstLine().yAt(x) - stray - 1;
+        final int bottom = staff.getLastLine().yAt(x) + stray + 1;
+        final Rectangle band = new Rectangle(box.x, top, box.width, bottom - top + 1);
+
+        final ByteProcessor source = system.getSheet().getPicture().getSource(
+                Picture.SourceKey.NO_STAFF);
+        final ByteProcessor buf = new ByteProcessor(band.width, band.height);
+        buf.copyBits(source, -band.x, -band.y, Blitter.COPY);
+
+        final RunTable runTable = new RunTableFactory(Orientation.VERTICAL).createTable(buf);
+
+        for (Glyph ink : GlyphFactory.buildGlyphs(runTable, band.getLocation())) {
+            final Rectangle inkBox = ink.getBounds();
+
+            if (inkBox.intersects(box) && ((inkBox.y == band.y)
+                    || ((inkBox.y + inkBox.height) == (band.y + band.height)))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    //-------------//
     // readOpening //
     //-------------//
     /**
@@ -117,8 +178,28 @@ public class BasicTimeBuilder
 
         final HeaderTimeBuilder opening = new HeaderTimeBuilder(staff, column, range);
         opening.findCandidates();
-        basicColumn.timeSet.addAll(opening.wholes);
-        basicColumn.timeSet.addAll(opening.nums);
-        basicColumn.timeSet.addAll(opening.dens);
+
+        for (List<Inter> found : Arrays.asList(opening.wholes, opening.nums, opening.dens)) {
+            for (Inter candidate : found) {
+                if (leavesStaff(candidate)) {
+                    candidate.remove();
+                } else {
+                    basicColumn.timeSet.add(candidate);
+                }
+            }
+        }
+    }
+
+    //~ Inner Classes ------------------------------------------------------------------------------
+
+    //-----------//
+    // Constants //
+    //-----------//
+    private static class Constants
+            extends ConstantSet
+    {
+        private final Scale.Fraction maxStray = new Scale.Fraction(
+                0.5,
+                "Maximum distance a time signature ink may stray past the staff outer lines");
     }
 }
