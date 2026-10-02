@@ -583,12 +583,24 @@ public class EndingInter
 
         // Right bar
         StaffBarlineInter rightBar = lookupBar(RIGHT, staff, systemBars, profile);
+        final EndingBarRelation rightRel = new EndingBarRelation(RIGHT);
 
         if (rightBar != null) {
             double rightDist = scale.pixelsToFrac(rightBar.getCenter().x - line.getX2());
-            final EndingBarRelation rightRel = new EndingBarRelation(RIGHT);
             rightRel.setInOutGaps(rightDist, 0, profile);
+        } else if (rightLeg == null) {
+            // An ending open on its right may stop short of any barline, as a stub does over the
+            // front of the measure opening a system. It ends with the measure its line ends in.
+            final Measure measure = staff.getPart().getMeasureAt(line.getP2(), staff);
+            final PartBarline partLine = (measure != null) ? measure.getRightPartBarline() : null;
 
+            if (partLine != null) {
+                rightBar = partLine.getStaffBarline(staff.getPart(), staff);
+                rightRel.setInOutGaps(0, 0, profile);
+            }
+        }
+
+        if (rightBar != null) {
             links.add(new Link(rightBar, rightRel, true));
         }
 
