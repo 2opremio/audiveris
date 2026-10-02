@@ -239,12 +239,26 @@ public class EndingsBuilder
             return null;
         }
 
+        // Left leg (optional)
+        final Point leftPt = seg.getEnd(true);
+        final int leftStaffY = staff.getFirstLine().yAt(leftPt.x);
+        final Filament leftLeg = lookupLeg(seg, leftPt, leftStaffY, system);
+
+        // Right leg (optional)
+        final Point rightPt = seg.getEnd(false);
+        final int rightStaffY = staff.getFirstLine().yAt(rightPt.x);
+        final Filament rightLeg = lookupLeg(seg, rightPt, rightStaffY, system);
+
         // Accept a lower ratio for first measure in system (due to room for clef + key? + time?)
-        final Constant.Ratio minRatio = (measure.getStack() == system.getFirstStack())
-                ? constants.minFirstMeasureRatio
+        final boolean opensSystem = measure.getStack() == system.getFirstStack();
+        final Constant.Ratio minRatio = opensSystem ? constants.minFirstMeasureRatio
                 : constants.minMeasureRatio;
 
-        if (length < (measure.getWidth() * minRatio.getValue())) {
+        // An ending that opens a system may be drawn as a stub: a left leg and a short line
+        // over the front of the measure, open on its right.
+        final boolean stub = opensSystem && (leftLeg != null) && (rightLeg == null);
+
+        if (!stub && (length < (measure.getWidth() * minRatio.getValue()))) {
             logger.debug("Ending {} too short compared with related {}", segment, measure);
 
             return null;
@@ -260,16 +274,6 @@ public class EndingsBuilder
         if (impacts.getGrade() < EndingInter.getMinGrade()) {
             return null;
         }
-
-        // Left leg (optional)
-        final Point leftPt = seg.getEnd(true);
-        final int leftStaffY = staff.getFirstLine().yAt(leftPt.x);
-        final Filament leftLeg = lookupLeg(seg, leftPt, leftStaffY, system);
-
-        // Right leg (optional)
-        final Point rightPt = seg.getEnd(false);
-        final int rightStaffY = staff.getFirstLine().yAt(rightPt.x);
-        final Filament rightLeg = lookupLeg(seg, rightPt, rightStaffY, system);
 
         if (closesBox(seg, leftLeg, rightLeg, leftStaffY, system)) {
             logger.debug("Ending {} is a side of a box", segment);
