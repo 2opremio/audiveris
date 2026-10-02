@@ -115,16 +115,23 @@ public class HeaderTimeBuilder
                               TimeColumn column,
                               int browseStart)
     {
+        this(staff, column, headerRange(staff, browseStart));
+    }
+
+    /**
+     * Creates an instance of {code HeaderTimeBuilder} browsing the provided range,
+     * which may lie anywhere along the staff.
+     *
+     * @param staff  the staff to work on
+     * @param column the column manager
+     * @param range  the range to browse, from its browseStart
+     */
+    HeaderTimeBuilder (Staff staff,
+                       TimeColumn column,
+                       StaffHeader.Range range)
+    {
         super(staff, column);
-
-        final StaffHeader header = staff.getHeader();
-
-        if (header.timeRange != null) {
-            range = header.timeRange;
-        } else {
-            header.timeRange = (range = new StaffHeader.Range());
-            range.browseStart = browseStart;
-        }
+        this.range = range;
 
         final Sheet sheet = staff.getSystem().getSheet();
         roi = sheet.clamp(getRoi());
@@ -372,6 +379,25 @@ public class HeaderTimeBuilder
         }
 
         return spaces;
+    }
+
+    //-------------//
+    // headerRange //
+    //-------------//
+    /**
+     * Report the time range of the staff header, created from browseStart if not yet known.
+     */
+    private static StaffHeader.Range headerRange (Staff staff,
+                                                  int browseStart)
+    {
+        final StaffHeader header = staff.getHeader();
+
+        if (header.timeRange == null) {
+            header.timeRange = new StaffHeader.Range();
+            header.timeRange.browseStart = browseStart;
+        }
+
+        return header.timeRange;
     }
 
     //------------//

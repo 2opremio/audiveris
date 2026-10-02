@@ -22,9 +22,12 @@
 package org.audiveris.omr.sheet.time;
 
 import org.audiveris.omr.sheet.Staff;
+import org.audiveris.omr.sheet.header.StaffHeader;
+import org.audiveris.omr.sheet.rhythm.MeasureStack;
 import org.audiveris.omr.sig.inter.Inter;
 import org.audiveris.omr.sig.inter.TimeNumberInter;
 import org.audiveris.omr.sig.inter.TimeWholeInter;
+import org.audiveris.omr.util.HorizontalSide;
 import org.audiveris.omr.util.VerticalSide;
 
 /**
@@ -61,12 +64,16 @@ public class BasicTimeBuilder
         throw new UnsupportedOperationException("Not supported yet.");
     }
 
+    //----------------//
+    // findCandidates //
+    //----------------//
     @Override
     protected void findCandidates ()
     {
         // For time symbols found (whole or half), pitch is correct, but abscissa is random
         // For now, at staff level, we can only check that nums & dens are x-compatible
         BasicTimeColumn basicColumn = (BasicTimeColumn) column;
+        readOpening(basicColumn);
 
         for (Inter inter : basicColumn.timeSet) {
             if (inter.getStaff() == staff) {
@@ -84,5 +91,34 @@ public class BasicTimeBuilder
                 }
             }
         }
+    }
+
+    //-------------//
+    // readOpening //
+    //-------------//
+    /**
+     * A time signature opens the measure it governs, so the opening of the staff measure
+     * in this stack is read from the image the way a staff header is, whatever the symbols
+     * step made of that ink.
+     * The first stack of a system opens with the staff header, read by the header step.
+     *
+     * @param basicColumn the column, whose time set gets the candidates found
+     */
+    private void readOpening (BasicTimeColumn basicColumn)
+    {
+        final MeasureStack stack = basicColumn.stack;
+
+        if (stack == system.getFirstStack()) {
+            return;
+        }
+
+        final StaffHeader.Range range = new StaffHeader.Range();
+        range.browseStart = stack.getMeasureAt(staff).getAbscissa(HorizontalSide.LEFT, staff);
+
+        final HeaderTimeBuilder opening = new HeaderTimeBuilder(staff, column, range);
+        opening.findCandidates();
+        basicColumn.timeSet.addAll(opening.wholes);
+        basicColumn.timeSet.addAll(opening.nums);
+        basicColumn.timeSet.addAll(opening.dens);
     }
 }

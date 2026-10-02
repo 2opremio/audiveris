@@ -685,8 +685,8 @@ public class InterFactory
     /**
      * Handle time inters outside of system header.
      * <p>
-     * Isolated time inters found outside of system header lead to the retrieval of a column of
-     * time signatures.
+     * Isolated time inters found outside of system header, and the opening of every measure
+     * stack past the first, lead to the retrieval of a column of time signatures.
      */
     private void handleTimes ()
     {
@@ -708,15 +708,18 @@ public class InterFactory
 
         systemTimes.removeAll(headerTimes);
 
-        if (systemTimes.isEmpty()) {
-            return;
-        }
-
-        // Dispatch these time inters into their containing stack
+        // Every stack past the first is checked, since a signature may open it
         final Map<MeasureStack, Set<Inter>> timeMap = new TreeMap<>(
                 (s1,
                  s2) -> Integer.compare(s1.getIdValue(), s2.getIdValue()));
 
+        for (MeasureStack stack : system.getStacks()) {
+            if (stack != system.getFirstStack()) {
+                timeMap.put(stack, new LinkedHashSet<>());
+            }
+        }
+
+        // Dispatch these time inters into their containing stack
         for (Inter inter : systemTimes) {
             final MeasureStack stack = system.getStackAt(inter.getCenter());
 
